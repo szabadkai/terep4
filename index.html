@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🚙</text></svg>"
+    />
+    <title>Terep4 — off-road</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0c1014;
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+      #app canvas {
+        display: block;
+      }
+      .hud-panel {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(10, 16, 22, 0.55);
+        color: #e8eef4;
+        user-select: none;
+        pointer-events: none;
+      }
+      .hud-speed {
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+      .hud-speed small {
+        font-size: 13px;
+        font-weight: 400;
+        opacity: 0.7;
+      }
+      .hud-row {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        font-size: 13px;
+        opacity: 0.9;
+      }
+      .hud-slide {
+        color: #ffb454;
+        font-weight: 700;
+        visibility: hidden;
+      }
+      .hud-help {
+        position: absolute;
+        bottom: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(232, 238, 244, 0.75);
+        background: rgba(10, 16, 22, 0.45);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        user-select: none;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
