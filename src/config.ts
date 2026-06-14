@@ -318,10 +318,33 @@ export function opponentConfig(spec: OpponentSpec): VehicleConfig {
 export const AI = {
   /** Steering gain: target steer = clamp(gain * bearingError). */
   steerGain: 2.2,
+  /** Nominal cruise speed for skilled AI on easy terrain (m/s). */
+  cruiseSpeed: 25,
+  /** Lowest speed target while still trying to drive forward (m/s). */
+  minTargetSpeed: 5,
   /** Ease off throttle when |bearing error| exceeds this (rad). */
   cautionAngle: 0.5,
   /** Brake when |bearing error| exceeds this and moving fast (rad). */
   brakeAngle: 1.1,
+  /** Start treating the chassis as risky when its local up vector drops here. */
+  tiltCautionUp: 0.82,
+  /** Crawl if the chassis is tilted at/under this local-up dot. */
+  tiltDangerUp: 0.62,
+  /** Roll/pitch angular speed where AI begins to lift (rad/s). */
+  tumbleCautionRate: 1.7,
+  /** Roll/pitch angular speed that forces a crawl (rad/s). */
+  tumbleDangerRate: 3.3,
+  /** Throttle multiplier when most grounded wheels are sliding. */
+  slideThrottle: 0.45,
+  /** Terrain speed multipliers by surface under grounded wheels. */
+  surfaceSpeed: {
+    grass: 1,
+    rock: 0.82,
+    mud: 0.48,
+    sand: 0.6,
+    snow: 0.52,
+    water: 0.36,
+  },
   /** Below this target-speed fraction, don't brake (let it coast/turn). */
   brakeSpeed: 14,
   /** Look this far past the current checkpoint to smooth the racing line (m). */
@@ -336,6 +359,10 @@ export const AI = {
   stuckSpeed: 1.2,
   /** ...for this long (s); then reverse to unstick. */
   stuckTime: 1.4,
+  /** Also reverse when distance to the checkpoint fails to improve this long. */
+  poorProgressTime: 2.2,
+  /** Minimum checkpoint-distance improvement per second before AI worries. */
+  minProgressRate: 0.7,
   /** Duration of the reverse-unstick maneuver (s). */
   unstickTime: 1.1,
   /** Capture radius for AI checkpoints. Larger than the player's so a fast
