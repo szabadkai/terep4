@@ -19,6 +19,7 @@ import { CameraRig } from './render/cameraRig';
 import { Hud } from './render/hud';
 import { GameUi } from './render/ui';
 import { DebugOverlay } from './render/debugOverlay';
+import { WheelParticles } from './render/wheelParticles';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container');
@@ -35,6 +36,7 @@ const scatterView = new ScatterView(scene, terrain);
 const vehicleView = new VehicleView(scene, terrain);
 const opponentViews = world.racerViews.map((rv) => new VehicleView(scene, terrain, rv.spec.color));
 const checkpointView = new CheckpointView(scene, terrain, world.race.checkpoints);
+const wheelParticles = new WheelParticles(scene, terrain);
 const cameraRig = new CameraRig(camera, terrain);
 const ui = new GameUi(container, () => input.pushAction());
 const hud = new Hud(container, ui.best);
@@ -81,6 +83,11 @@ const loop = new FixedLoop(
     for (let i = 0; i < opponentViews.length; i++) {
       opponentViews[i].update(world.racerViews[i].prev, world.racerViews[i].curr, alpha);
     }
+    wheelParticles.update(frameDt);
+    wheelParticles.emitVehicle(0, vehicleView, world.curr, frameDt);
+    for (let i = 0; i < opponentViews.length; i++) {
+      wheelParticles.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr, frameDt);
+    }
     terrainView.update(vehicleView.group.position.x, vehicleView.group.position.z);
     scatterView.update(vehicleView.group.position.x, vehicleView.group.position.z);
     checkpointView.update(world.raceState, clock);
@@ -109,5 +116,10 @@ loop.start();
 if (import.meta.env.DEV) {
   // Dev console handle for poking the sim (not part of any layer contract).
   const { forEachItemNear } = await import('./terrain/scatter');
-  (window as unknown as Record<string, unknown>).__terep = { world, terrain, forEachItemNear };
+  (window as unknown as Record<string, unknown>).__terep = {
+    world,
+    terrain,
+    forEachItemNear,
+    wheelParticles,
+  };
 }

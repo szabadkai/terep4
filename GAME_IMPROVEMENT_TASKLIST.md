@@ -150,7 +150,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 
 ## Milestone 3: Visual Richness
 
-### [ ] Add Wheel Surface Particles
+### [x] Add Wheel Surface Particles
 
 **Goal:** Give immediate visual feedback for terrain and speed.
 
