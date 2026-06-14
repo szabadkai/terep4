@@ -292,22 +292,72 @@ export interface OpponentSpec {
   startOffset: number;
   /** 0..1 skill: scales target speed and steering precision. */
   skill: number;
+  /** Driving behavior multipliers; 1 is neutral. */
+  profile: AiDriverProfile;
   /** Engine power multiplier vs. the player buggy. */
   power: number;
   /** Top-speed multiplier vs. the player buggy. */
   topSpeed: number;
 }
 
+export interface AiDriverProfile {
+  /** Higher values carry more speed and brake later. */
+  aggression: number;
+  /** Higher values avoid and slow down more for bad surfaces. */
+  terrainCaution: number;
+  /** Higher values spend longer recovering before giving up/resetting. */
+  recoveryPatience: number;
+  /** Higher values brake earlier and harder. */
+  brakeBias: number;
+  /** Multiplier for the AI's target cruise speed. */
+  preferredSpeed: number;
+}
+
 export const OPPONENTS: OpponentSpec[] = [
-  { name: 'Sárkány', color: 0x3b7dd8, startOffset: -3.2, skill: 0.96, power: 1.04, topSpeed: 1.02 },
-  { name: 'Borz', color: 0x4caf50, startOffset: 3.2, skill: 0.9, power: 1.0, topSpeed: 1.0 },
+  {
+    name: 'Sárkány',
+    color: 0x3b7dd8,
+    startOffset: -3.2,
+    skill: 0.97,
+    profile: {
+      aggression: 1.14,
+      terrainCaution: 0.86,
+      recoveryPatience: 0.9,
+      brakeBias: 0.9,
+      preferredSpeed: 1.1,
+    },
+    power: 1.07,
+    topSpeed: 1.05,
+  },
+  {
+    name: 'Borz',
+    color: 0x4caf50,
+    startOffset: 3.2,
+    skill: 0.91,
+    profile: {
+      aggression: 0.94,
+      terrainCaution: 1.03,
+      recoveryPatience: 1.06,
+      brakeBias: 1.1,
+      preferredSpeed: 0.96,
+    },
+    power: 0.99,
+    topSpeed: 0.98,
+  },
   {
     name: 'Vaddisznó',
     color: 0xe0a32e,
     startOffset: -6.4,
-    skill: 0.84,
-    power: 0.97,
-    topSpeed: 0.97,
+    skill: 0.86,
+    profile: {
+      aggression: 0.96,
+      terrainCaution: 1.04,
+      recoveryPatience: 0.95,
+      brakeBias: 1.06,
+      preferredSpeed: 0.99,
+    },
+    power: 0.98,
+    topSpeed: 0.96,
   },
 ];
 
@@ -353,6 +403,8 @@ export const AI = {
     snow: 0.52,
     water: 0.36,
   },
+  /** Floor after personality terrain-caution scaling. */
+  minSurfaceSpeedMultiplier: 0.24,
   /** Below this target-speed fraction, don't brake (let it coast/turn). */
   brakeSpeed: 14,
   /** Minimum lookahead past the current checkpoint at low speed (m). */

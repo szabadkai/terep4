@@ -6,7 +6,7 @@
  * obstacle bounce) emerges from the shared vehicle simulation.
  */
 
-import { AI } from '../config';
+import { AI, type AiDriverProfile } from '../config';
 import { Vec3, clamp } from '../core/math';
 import type { InputState } from '../input/input';
 import type { Vehicle } from './vehicle';
@@ -39,9 +39,18 @@ export interface AiTelemetry {
   stuckAttempts: number;
   resetRequested: boolean;
   rolloverTimer: number;
+  profile: AiDriverProfile;
 }
 
-function makeTelemetry(): AiTelemetry {
+const NEUTRAL_PROFILE: AiDriverProfile = {
+  aggression: 1,
+  terrainCaution: 1,
+  recoveryPatience: 1,
+  brakeBias: 1,
+  preferredSpeed: 1,
+};
+
+function makeTelemetry(profile: AiDriverProfile = NEUTRAL_PROFILE): AiTelemetry {
   return {
     targetSpeed: 0,
     bearingError: 0,
@@ -57,6 +66,7 @@ function makeTelemetry(): AiTelemetry {
     stuckAttempts: 0,
     resetRequested: false,
     rolloverTimer: 0,
+    profile: { ...profile },
   };
 }
 
@@ -68,7 +78,7 @@ export class AiDriver {
     handbrake: false,
     reset: false,
   };
-  readonly telemetry: AiTelemetry = makeTelemetry();
+  readonly telemetry: AiTelemetry;
 
   private stuckTimer = 0;
   private progressTimer = 0;
@@ -80,7 +90,12 @@ export class AiDriver {
   private resetQueued = false;
   private rolloverTimer = 0;
 
-  constructor(private readonly skill: number) {}
+  constructor(
+    private readonly skill: number,
+    private readonly profile: AiDriverProfile = NEUTRAL_PROFILE,
+  ) {
+    this.telemetry = makeTelemetry(profile);
+  }
 
   reset(): void {
     this.stuckTimer = 0;
@@ -97,7 +112,7 @@ export class AiDriver {
     this.input.steer = 0;
     this.input.handbrake = false;
     this.input.reset = false;
-    Object.assign(this.telemetry, makeTelemetry());
+    Object.assign(this.telemetry, makeTelemetry(this.profile));
   }
 
   takeResetRequest(): boolean {
@@ -159,8 +174,13 @@ export class AiDriver {
     const waterCount = grounded.filter((w) => w.surface === 'water').length;
     const mostlyWater = groundedCount > 0 && waterCount / groundedCount >= 0.5;
     const slideRatio = groundedCount > 0 ? slidingCount / groundedCount : 0;
-    const surfaceMul =
+    const rawSurfaceMul =
       groundedCount > 0 ? Math.min(...grounded.map((w) => AI.surfaceSpeed[w.surface])) : 0.65;
+    const surfaceMul = clamp(
+      1 - (1 - rawSurfaceMul) * this.profile.terrainCaution,
+      AI.minSurfaceSpeedMultiplier,
+      1.08,
+    );
 
     vehicle.body.localDirToWorld(localUp, up);
     const upright = clamp(up.y, 0, 1);
@@ -193,6 +213,8 @@ export class AiDriver {
     this.lastCpDist = cpDist;
     const tryingToDrive = input.throttle > 0.35 || input.brake > 0.35;
     const terrainStuckSpeed = mostlyWater ? AI.stuckSpeed * 1.4 : AI.stuckSpeed;
+    const stuckTime = AI.stuckTime * this.profile.recoveryPatience;
+    const poorProgressTime = AI.poorProgressTime * this.profile.recoveryPatience;
     if (
       tryingToDrive &&
       cpDist > AI.captureRadius &&
@@ -212,7 +234,7 @@ export class AiDriver {
     } else {
       this.progressTimer = Math.max(0, this.progressTimer - dt * 2);
     }
-    if (this.stuckTimer > AI.stuckTime || this.progressTimer > AI.poorProgressTime) {
+    if (this.stuckTimer > stuckTime || this.progressTimer > poorProgressTime) {
       this.beginRecoveryAttempt(cpDist);
       return this.driveRecovery(error, forwardSpeed, cpDist, dt);
     }
@@ -221,15 +243,23 @@ export class AiDriver {
 
     // --- Steering: proportional to bearing error (negated for the steer
     // convention), sharper with higher skill.
-    input.steer = clamp(-AI.steerGain * this.skill * error, -1, 1);
+    const aggression = this.profile.aggression;
+    const brakeBias = this.profile.brakeBias;
+    const steerSkill = this.skill * (0.92 + aggression * 0.08);
+    input.steer = clamp(-AI.steerGain * steerSkill * error, -1, 1);
 
     // --- Pedals: chase a target speed instead of running every straight at
     // full power. The target drops for tight turns, poor surfaces, sliding,
     // and risky chassis attitude so the car has time to recover.
-    const caution = AI.cautionAngle * (0.6 + 0.4 * this.skill);
-    let targetSpeed = AI.cruiseSpeed * (0.78 + 0.22 * this.skill);
+    const caution = AI.cautionAngle * (0.6 + 0.4 * this.skill) * (1.12 - aggression * 0.12);
+    let targetSpeed =
+      AI.cruiseSpeed *
+      (0.78 + 0.22 * this.skill) *
+      this.profile.preferredSpeed *
+      (0.94 + aggression * 0.06);
     if (absErr > caution) {
-      const turnMul = clamp(1 - (absErr - caution) / (AI.brakeAngle - caution), 0.28, 1);
+      const brakeAngle = AI.brakeAngle * (1.1 - brakeBias * 0.1) * (0.92 + aggression * 0.08);
+      const turnMul = clamp(1 - (absErr - caution) / (brakeAngle - caution), 0.24, 1);
       targetSpeed *= turnMul;
     }
     targetSpeed *= surfaceMul * clamp(0.35 + 0.65 * tiltMul, 0.35, 1) * tumbleMul;
@@ -237,15 +267,20 @@ export class AiDriver {
     this.telemetry.targetSpeed = targetSpeed;
 
     const speedError = targetSpeed - Math.max(0, forwardSpeed);
-    input.throttle = clamp(speedError / 7, 0, 1) * (0.7 + 0.3 * this.skill);
+    input.throttle = clamp((speedError * aggression) / 7, 0, 1) * (0.7 + 0.3 * this.skill);
     input.brake =
-      (forwardSpeed > targetSpeed + 2.5 || (absErr > AI.brakeAngle && speed > AI.brakeSpeed)) &&
+      (forwardSpeed > targetSpeed + 2.5 / brakeBias ||
+        (absErr > AI.brakeAngle * (1.08 - brakeBias * 0.08) && speed > AI.brakeSpeed)) &&
       forwardSpeed > AI.minTargetSpeed
-        ? clamp((forwardSpeed - targetSpeed) / 8, 0.25, 1)
+        ? clamp(((forwardSpeed - targetSpeed) / 8) * brakeBias, 0.2 * brakeBias, 1)
         : 0;
     if (slideRatio > 0.5) {
-      input.throttle *= AI.slideThrottle;
-      if (forwardSpeed > targetSpeed) input.brake = Math.max(input.brake, 0.35);
+      input.throttle *= clamp(
+        AI.slideThrottle / Math.sqrt(this.profile.terrainCaution),
+        0.34,
+        0.58,
+      );
+      if (forwardSpeed > targetSpeed) input.brake = Math.max(input.brake, 0.35 * brakeBias);
     }
 
     // Near the gate but pointed away → we're about to orbit it. Brake to crawl
@@ -253,11 +288,11 @@ export class AiDriver {
     if (cpDist < AI.approachDist && absErr > AI.approachAngle) {
       const tuck = clamp(cpDist / AI.approachDist, AI.approachThrottle, 1);
       input.throttle *= tuck;
-      if (speed > AI.brakeSpeed && absErr > AI.brakeAngle * 0.6) input.brake = 1;
+      if (speed > AI.brakeSpeed && absErr > AI.brakeAngle * 0.6) input.brake = brakeBias;
     }
     if (tiltMul < 1 || tumbleMul < 1) {
       input.throttle *= Math.min(tiltMul, tumbleMul);
-      if (forwardSpeed > AI.minTargetSpeed) input.brake = Math.max(input.brake, 0.4);
+      if (forwardSpeed > AI.minTargetSpeed) input.brake = Math.max(input.brake, 0.4 * brakeBias);
     }
     input.handbrake = false;
     this.updateRecoveryTelemetry();
@@ -292,12 +327,16 @@ export class AiDriver {
   private beginRecoveryAttempt(cpDist: number): void {
     this.stuckAttempts++;
     this.resetStuckTracking(cpDist);
-    if (this.stuckAttempts >= AI.recoveryMaxAttemptsPerCheckpoint) {
+    const maxAttempts = Math.max(
+      1,
+      Math.round(AI.recoveryMaxAttemptsPerCheckpoint * this.profile.recoveryPatience),
+    );
+    if (this.stuckAttempts >= maxAttempts) {
       this.beginResetIfHopeless(cpDist);
       return;
     }
     this.recoveryState = 'pause';
-    this.recoveryTimer = AI.recoveryPauseTime;
+    this.recoveryTimer = AI.recoveryPauseTime * this.profile.recoveryPatience;
     this.updateRecoveryTelemetry();
   }
 
@@ -336,8 +375,12 @@ export class AiDriver {
       case 'crawl':
         this.telemetry.targetSpeed = AI.minTargetSpeed;
         input.throttle = forwardSpeed < AI.minTargetSpeed ? AI.recoveryCrawlThrottle : 0.08;
-        input.brake = forwardSpeed > AI.minTargetSpeed + 1 ? 0.25 : 0;
-        input.steer = clamp(-AI.steerGain * this.skill * error, -0.65, 0.65);
+        input.brake = forwardSpeed > AI.minTargetSpeed + 1 ? 0.25 * this.profile.brakeBias : 0;
+        input.steer = clamp(
+          -AI.steerGain * this.skill * (0.92 + this.profile.aggression * 0.08) * error,
+          -0.65,
+          0.65,
+        );
         break;
       case 'reset-if-hopeless':
         this.telemetry.targetSpeed = 0;
@@ -366,11 +409,12 @@ export class AiDriver {
       case 'pause':
         this.recoveryState = 'reverse';
         this.recoveryTimer =
-          AI.unstickTime + Math.max(0, this.stuckAttempts - 1) * AI.recoveryRepeatReverseBonus;
+          (AI.unstickTime + Math.max(0, this.stuckAttempts - 1) * AI.recoveryRepeatReverseBonus) *
+          this.profile.recoveryPatience;
         break;
       case 'reverse':
         this.recoveryState = 'crawl';
-        this.recoveryTimer = AI.recoveryCrawlTime;
+        this.recoveryTimer = AI.recoveryCrawlTime * this.profile.recoveryPatience;
         break;
       case 'crawl':
         this.recoveryState = 'normal';
@@ -379,7 +423,7 @@ export class AiDriver {
         break;
       case 'reset-if-hopeless':
         this.recoveryState = 'crawl';
-        this.recoveryTimer = AI.recoveryCrawlTime;
+        this.recoveryTimer = AI.recoveryCrawlTime * this.profile.recoveryPatience;
         break;
       case 'normal':
         break;

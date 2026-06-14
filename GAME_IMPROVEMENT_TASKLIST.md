@@ -129,7 +129,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** Medium  
 **Depends On:** AI Telemetry Fields
 
-### [ ] Add AI Driver Personalities
+### [x] Add AI Driver Personalities
 
 **Goal:** Make opponents feel distinct.
 

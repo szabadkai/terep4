@@ -26,7 +26,7 @@ export class Racer {
     private readonly checkpoints: readonly Checkpoint[],
   ) {
     this.vehicle = new Vehicle(opponentConfig(spec), terrain);
-    this.driver = new AiDriver(spec.skill);
+    this.driver = new AiDriver(spec.skill, spec.profile);
   }
 
   get telemetry(): AiTelemetry {
@@ -153,7 +153,8 @@ export class Racer {
       let score = Math.abs(delta) * 7;
       for (const d of [12, 24, 40, AI.escapeScanDist]) {
         const surface = this.terrain.surface(pos.x + sx * d, pos.z + sz * d);
-        score += SURFACE_ROUTE_PENALTY[surface] * (d < 24 ? 1.5 : 1);
+        score +=
+          SURFACE_ROUTE_PENALTY[surface] * this.spec.profile.terrainCaution * (d < 24 ? 1.5 : 1);
       }
       if (score < bestScore) {
         bestScore = score;
@@ -198,7 +199,7 @@ export class Racer {
       const h = this.terrain.height(sx, sz);
       const surface = this.terrain.surface(sx, sz);
       const slope = Math.abs(h - prevH) / (scanDist / samples);
-      score += SURFACE_ROUTE_PENALTY[surface] * (1.2 - t * 0.25);
+      score += SURFACE_ROUTE_PENALTY[surface] * this.spec.profile.terrainCaution * (1.2 - t * 0.25);
       score += Math.max(0, slope - 0.22) * 32;
       prevH = h;
     }

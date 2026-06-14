@@ -94,6 +94,7 @@ export class DebugOverlay {
         <h3>${racer.spec.name} <span>CP ${Math.min(racer.current + 1, checkpointCount)}/${checkpointCount}</span></h3>
         <div class="debug-grid">
           <span>speed/target</span><b>${(Math.hypot(vehicle.body.vel.x, vehicle.body.vel.z) * 3.6).toFixed(0)} km/h · ${t.targetSpeed.toFixed(1)} m/s</b>
+          <span>profile</span><b>A ${t.profile.aggression.toFixed(2)} T ${t.profile.terrainCaution.toFixed(2)} R ${t.profile.recoveryPatience.toFixed(2)} B ${t.profile.brakeBias.toFixed(2)} S ${t.profile.preferredSpeed.toFixed(2)}</b>
           <span>cp dist</span><b>${cpDist.toFixed(1)}m</b>
           <span>error</span><b>${radToDeg(t.bearingError).toFixed(0)} deg</b>
           <span>surface mul</span><b>${t.surfaceMultiplier.toFixed(2)}</b>
