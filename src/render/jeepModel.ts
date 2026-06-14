@@ -168,15 +168,43 @@ export function buildJeep(bodyColor: number = COLORS.body): THREE.Group {
 
   // Trim details: bumpers, fender flares, roof rack, mirrors, lights, spare.
   const trimMat = new THREE.MeshLambertMaterial({ color: COLORS.trim, flatShading: true });
+  const underMat = new THREE.MeshLambertMaterial({ color: 0x12171b, flatShading: true });
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     group.add(mesh);
     return mesh;
   };
+  const addPart = (
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    ry = 0,
+  ) => {
+    const mesh = add(geo, mat, x, y, z);
+    mesh.rotation.y = ry;
+    return mesh;
+  };
 
   add(new THREE.BoxGeometry(1.56, 0.16, 0.2), trimMat, 0, 0.14, 1.95);
   add(new THREE.BoxGeometry(1.56, 0.16, 0.2), trimMat, 0, 0.18, -1.95);
+  // Undercarriage: visually separates the body from the ground/wheels so
+  // jumps and rollovers do not expose a single flat painted slab.
+  add(new THREE.BoxGeometry(1.18, 0.1, 2.95), underMat, 0, -0.02, -0.04);
+  add(new THREE.BoxGeometry(0.1, 0.18, 3.26), trimMat, -0.54, -0.08, -0.04);
+  add(new THREE.BoxGeometry(0.1, 0.18, 3.26), trimMat, 0.54, -0.08, -0.04);
+  add(new THREE.BoxGeometry(1.68, 0.08, 0.1), trimMat, 0, -0.18, 1.32);
+  add(new THREE.BoxGeometry(1.68, 0.08, 0.1), trimMat, 0, -0.18, -1.32);
+  add(new THREE.BoxGeometry(0.44, 0.22, 0.34), underMat, 0, -0.12, 1.32);
+  add(new THREE.BoxGeometry(0.44, 0.22, 0.34), underMat, 0, -0.12, -1.32);
+  for (const sx of [-1, 1]) {
+    for (const z of [1.32, -1.32]) {
+      addPart(new THREE.BoxGeometry(0.62, 0.06, 0.08), trimMat, sx * 0.36, -0.16, z, sx * 0.28);
+      add(new THREE.BoxGeometry(0.46, 0.26, 0.86), underMat, sx * 0.73, 0.14, z);
+    }
+  }
   const flares: Record<number, THREE.BufferGeometry> = {
     1: flareGeometry(1),
     [-1]: flareGeometry(-1),
