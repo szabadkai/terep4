@@ -19,6 +19,12 @@ export interface VehicleSnapshot {
   pos: { x: number; y: number; z: number };
   quat: { x: number; y: number; z: number; w: number };
   wheels: WheelSnapshot[];
+  controls: {
+    throttle: number;
+    brake: number;
+    steer: number;
+    handbrake: boolean;
+  };
   speedKmh: number;
   /** Surface under the majority of grounded wheels, or null if airborne. */
   surface: SurfaceId | null;
@@ -29,6 +35,12 @@ export function makeSnapshot(wheelCount: number): VehicleSnapshot {
   return {
     pos: { x: 0, y: 0, z: 0 },
     quat: { x: 0, y: 0, z: 0, w: 1 },
+    controls: {
+      throttle: 0,
+      brake: 0,
+      steer: 0,
+      handbrake: false,
+    },
     wheels: Array.from({ length: wheelCount }, () => ({
       steer: 0,
       spin: 0,
@@ -52,6 +64,10 @@ export function fillSnapshot(vehicle: Vehicle, out: VehicleSnapshot): void {
   out.quat.y = body.quat.y;
   out.quat.z = body.quat.z;
   out.quat.w = body.quat.w;
+  out.controls.throttle = vehicle.controls.throttle;
+  out.controls.brake = vehicle.controls.brake;
+  out.controls.steer = vehicle.controls.steer;
+  out.controls.handbrake = vehicle.controls.handbrake;
   out.speedKmh = body.vel.length() * 3.6;
 
   const counts = new Map<SurfaceId, number>();
@@ -82,6 +98,7 @@ export function fillSnapshot(vehicle: Vehicle, out: VehicleSnapshot): void {
 export function copySnapshot(from: VehicleSnapshot, to: VehicleSnapshot): void {
   Object.assign(to.pos, from.pos);
   Object.assign(to.quat, from.quat);
+  Object.assign(to.controls, from.controls);
   to.speedKmh = from.speedKmh;
   to.surface = from.surface;
   to.sliding = from.sliding;

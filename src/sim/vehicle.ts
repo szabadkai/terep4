@@ -24,6 +24,13 @@ const contactForce = new Vec3();
 export class Vehicle {
   readonly body: RigidBody;
   readonly wheels: Wheel[];
+  readonly controls: InputState = {
+    throttle: 0,
+    brake: 0,
+    steer: 0,
+    handbrake: false,
+    reset: false,
+  };
   steerAngle = 0;
 
   private readonly contactPoints: Vec3[];
@@ -53,6 +60,11 @@ export class Vehicle {
     this.body.angVel.set(0, 0, 0);
     this.body.quat.setAxisAngle(Y_AXIS, yaw);
     this.steerAngle = 0;
+    this.controls.throttle = 0;
+    this.controls.brake = 0;
+    this.controls.steer = 0;
+    this.controls.handbrake = false;
+    this.controls.reset = false;
     for (const w of this.wheels) w.rest();
   }
 
@@ -69,6 +81,11 @@ export class Vehicle {
 
   step(input: InputState, dt: number): void {
     const { body, cfg } = this;
+    this.controls.throttle = input.throttle;
+    this.controls.brake = input.brake;
+    this.controls.steer = input.steer;
+    this.controls.handbrake = input.handbrake;
+    this.controls.reset = input.reset;
     const vForward = this.forwardSpeed();
 
     this.updateSteering(input, vForward, dt);

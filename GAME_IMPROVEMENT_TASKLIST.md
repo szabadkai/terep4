@@ -210,7 +210,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** None
 
-### [ ] Upgrade Vehicle Visual Details
+### [x] Upgrade Vehicle Visual Details
 
 **Goal:** Make cars feel less like plain placeholders.
 

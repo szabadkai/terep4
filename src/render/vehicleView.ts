@@ -24,6 +24,7 @@ export class VehicleView {
   readonly group = new THREE.Group();
   private readonly steerGroups: THREE.Group[] = [];
   private readonly wheelMeshes: THREE.Mesh[] = [];
+  private readonly brakeLights: THREE.MeshBasicMaterial[] = [];
   private readonly shadow: THREE.Mesh;
   private readonly quatA = new THREE.Quaternion();
   private readonly quatB = new THREE.Quaternion();
@@ -32,8 +33,18 @@ export class VehicleView {
     scene: THREE.Scene,
     private readonly terrain: Terrain,
     bodyColor?: number,
+    variant = 0,
   ) {
-    this.group.add(buildJeep(bodyColor));
+    const model = buildJeep(bodyColor, {
+      accentColor: accentFor(bodyColor ?? COLORS.body, variant),
+      variant,
+    });
+    model.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.name === 'brakeLight') {
+        this.brakeLights.push(obj.material as THREE.MeshBasicMaterial);
+      }
+    });
+    this.group.add(model);
     this.buildWheels();
     scene.add(this.group);
 
@@ -75,7 +86,16 @@ export class VehicleView {
       this.wheelMeshes[i].rotation.x = lerpAngle(wp.spin, wc.spin, alpha);
     }
 
+    this.updateBrakeLights(lerp(prev.controls.brake, curr.controls.brake));
     this.updateShadow();
+  }
+
+  private updateBrakeLights(brake: number): void {
+    const active = brake > 0.08;
+    for (const mat of this.brakeLights) {
+      mat.color.setHex(active ? 0xff2b16 : COLORS.taillight);
+      mat.opacity = active ? 1 : 0.72;
+    }
   }
 
   private updateShadow(): void {
@@ -108,4 +128,11 @@ export class VehicleView {
       this.wheelMeshes.push(tire);
     }
   }
+}
+
+function accentFor(bodyColor: number, variant: number): number {
+  if (variant === 0) return 0xf0d14d;
+  const color = new THREE.Color(bodyColor);
+  color.offsetHSL(0.08 * variant, 0.1, 0.18);
+  return color.getHex();
 }

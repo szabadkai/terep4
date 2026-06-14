@@ -18,6 +18,11 @@ interface Section {
 const GLASS = new THREE.Color(COLORS.glass);
 const TRIM = new THREE.Color(COLORS.trim);
 
+export interface JeepVisualOptions {
+  accentColor?: number;
+  variant?: number;
+}
+
 class LoftBuilder {
   positions: number[] = [];
   normals: number[] = [];
@@ -132,7 +137,10 @@ function cabinRing(hwB: number, hwT: number, yB: number, yT: number): Pt[] {
   ];
 }
 
-export function buildJeep(bodyColor: number = COLORS.body): THREE.Group {
+export function buildJeep(
+  bodyColor: number = COLORS.body,
+  { accentColor = 0xf2d24a, variant = 0 }: JeepVisualOptions = {},
+): THREE.Group {
   const group = new THREE.Group();
   const lofts = new LoftBuilder();
   const PAINT = new THREE.Color(bodyColor);
@@ -169,6 +177,8 @@ export function buildJeep(bodyColor: number = COLORS.body): THREE.Group {
   // Trim details: bumpers, fender flares, roof rack, mirrors, lights, spare.
   const trimMat = new THREE.MeshLambertMaterial({ color: COLORS.trim, flatShading: true });
   const underMat = new THREE.MeshLambertMaterial({ color: 0x12171b, flatShading: true });
+  const accentMat = new THREE.MeshLambertMaterial({ color: accentColor, flatShading: true });
+  const plateMat = new THREE.MeshLambertMaterial({ color: 0xe8e2c8, flatShading: true });
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
@@ -190,6 +200,14 @@ export function buildJeep(bodyColor: number = COLORS.body): THREE.Group {
 
   add(new THREE.BoxGeometry(1.56, 0.16, 0.2), trimMat, 0, 0.14, 1.95);
   add(new THREE.BoxGeometry(1.56, 0.16, 0.2), trimMat, 0, 0.18, -1.95);
+  const exhaustGeo = new THREE.CylinderGeometry(0.045, 0.055, 0.48, 7);
+  exhaustGeo.rotateX(Math.PI / 2);
+  const exhaust = add(exhaustGeo, trimMat, 0.52, 0.1, -2.15);
+  exhaust.rotation.z = -0.12;
+  add(new THREE.BoxGeometry(0.5, 0.12, 0.03), plateMat, 0, 0.34, 2.07);
+  add(new THREE.BoxGeometry(0.52, 0.12, 0.03), plateMat, 0, 0.38, -2.07);
+  add(new THREE.BoxGeometry(0.05, 0.08, 1.7), accentMat, -0.89, 0.53, -0.35);
+  add(new THREE.BoxGeometry(0.05, 0.08, 1.7), accentMat, 0.89, 0.53, -0.35);
   // Undercarriage: visually separates the body from the ground/wheels so
   // jumps and rollovers do not expose a single flat painted slab.
   add(new THREE.BoxGeometry(1.18, 0.1, 2.95), underMat, 0, -0.02, -0.04);
@@ -215,15 +233,41 @@ export function buildJeep(bodyColor: number = COLORS.body): THREE.Group {
   }
   add(new THREE.BoxGeometry(0.06, 0.06, 1.5), trimMat, -0.48, 1.32, -0.64);
   add(new THREE.BoxGeometry(0.06, 0.06, 1.5), trimMat, 0.48, 1.32, -0.64);
+  add(new THREE.BoxGeometry(0.06, 0.76, 0.06), trimMat, -0.62, 0.96, 0.28);
+  add(new THREE.BoxGeometry(0.06, 0.76, 0.06), trimMat, 0.62, 0.96, 0.28);
+  add(new THREE.BoxGeometry(0.06, 0.72, 0.06), trimMat, -0.58, 0.96, -1.36);
+  add(new THREE.BoxGeometry(0.06, 0.72, 0.06), trimMat, 0.58, 0.96, -1.36);
+  add(new THREE.BoxGeometry(1.26, 0.06, 0.06), trimMat, 0, 1.35, 0.28);
+  add(new THREE.BoxGeometry(1.18, 0.06, 0.06), trimMat, 0, 1.32, -1.36);
+  addPart(new THREE.BoxGeometry(0.06, 0.06, 1.78), trimMat, -0.6, 1.34, -0.55, -0.08);
+  addPart(new THREE.BoxGeometry(0.06, 0.06, 1.78), trimMat, 0.6, 1.34, -0.55, 0.08);
   add(new THREE.BoxGeometry(0.16, 0.12, 0.04), trimMat, -0.82, 0.84, 0.44);
   add(new THREE.BoxGeometry(0.16, 0.12, 0.04), trimMat, 0.82, 0.84, 0.44);
 
   const headlight = new THREE.MeshBasicMaterial({ color: COLORS.headlight });
-  const taillight = new THREE.MeshBasicMaterial({ color: COLORS.taillight });
+  const taillight = new THREE.MeshBasicMaterial({
+    color: COLORS.taillight,
+    transparent: true,
+    opacity: 0.72,
+  });
   add(new THREE.BoxGeometry(0.22, 0.14, 0.06), headlight, -0.42, 0.49, 1.93);
   add(new THREE.BoxGeometry(0.22, 0.14, 0.06), headlight, 0.42, 0.49, 1.93);
-  add(new THREE.BoxGeometry(0.16, 0.12, 0.05), taillight, -0.6, 0.52, -1.97);
-  add(new THREE.BoxGeometry(0.16, 0.12, 0.05), taillight, 0.6, 0.52, -1.97);
+  const leftBrake = add(
+    new THREE.BoxGeometry(0.16, 0.12, 0.05),
+    taillight.clone(),
+    -0.6,
+    0.52,
+    -1.97,
+  );
+  const rightBrake = add(
+    new THREE.BoxGeometry(0.16, 0.12, 0.05),
+    taillight.clone(),
+    0.6,
+    0.52,
+    -1.97,
+  );
+  leftBrake.name = 'brakeLight';
+  rightBrake.name = 'brakeLight';
 
   const spareGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.21, 9);
   spareGeo.rotateX(Math.PI / 2);
@@ -235,7 +279,36 @@ export function buildJeep(bodyColor: number = COLORS.body): THREE.Group {
     -2.02,
   );
 
+  addVariantDetails(group, variant, trimMat, accentMat);
+
   return group;
+}
+
+function addVariantDetails(
+  group: THREE.Group,
+  variant: number,
+  trimMat: THREE.Material,
+  accentMat: THREE.Material,
+): void {
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    group.add(mesh);
+    return mesh;
+  };
+
+  if (variant % 3 === 1) {
+    add(new THREE.BoxGeometry(0.9, 0.1, 0.18), accentMat, 0, 1.42, 0.18);
+    add(new THREE.BoxGeometry(0.18, 0.12, 0.12), trimMat, -0.38, 1.4, 0.32);
+    add(new THREE.BoxGeometry(0.18, 0.12, 0.12), trimMat, 0.38, 1.4, 0.32);
+  } else if (variant % 3 === 2) {
+    add(new THREE.BoxGeometry(0.7, 0.18, 0.55), accentMat, 0, 1.44, -0.52);
+    add(new THREE.BoxGeometry(0.78, 0.06, 0.64), trimMat, 0, 1.56, -0.52);
+  } else if (variant % 3 === 0 && variant > 0) {
+    const snorkel = add(new THREE.BoxGeometry(0.09, 0.68, 0.09), trimMat, 0.78, 0.96, 0.76);
+    snorkel.rotation.z = -0.06;
+    add(new THREE.BoxGeometry(0.22, 0.08, 0.1), accentMat, 0.78, 1.31, 0.67);
+  }
 }
 
 /**

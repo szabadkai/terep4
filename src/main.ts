@@ -35,7 +35,9 @@ const { renderer, scene, camera, sky } = createScene(container);
 const terrainView = new TerrainView(scene, terrain);
 const scatterView = new ScatterView(scene, terrain);
 const vehicleView = new VehicleView(scene, terrain);
-const opponentViews = world.racerViews.map((rv) => new VehicleView(scene, terrain, rv.spec.color));
+const opponentViews = world.racerViews.map(
+  (rv, i) => new VehicleView(scene, terrain, rv.spec.color, i + 1),
+);
 const checkpointView = new CheckpointView(scene, terrain, world.race.checkpoints);
 const wheelParticles = new WheelParticles(scene, terrain);
 const tireTracks = new TireTracks(scene, terrain);
