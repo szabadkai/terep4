@@ -98,8 +98,8 @@ export class ScatterView {
 
 /** Non-indexed (flat-shaded) geometry with a baked uniform vertex color. */
 function paint(geo: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
-  const flat = geo.toNonIndexed();
-  geo.dispose();
+  const flat = geo.index ? geo.toNonIndexed() : geo;
+  if (flat !== geo) geo.dispose();
   flat.computeVertexNormals();
   const c = new THREE.Color(hex);
   const count = flat.attributes.position.count;

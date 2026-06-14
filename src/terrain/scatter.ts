@@ -42,11 +42,15 @@ export function itemInCell(
 
   const h = terrain.height(x, z);
   if (h < WORLD.waterLevel + WORLD.sandShore) return null;
+  const biome = terrain.biome(x, z);
 
   const size = 0.8 + 0.5 * hash2(cx, cz, seed + 505);
   const rotation = hash2(cx, cz, seed + 506) * Math.PI * 2;
 
-  const boulder = roll > 1 - SCATTER.boulderChance;
+  const boulderChance =
+    SCATTER.boulderChance *
+    (biome === 'rockyHighlands' ? 5.5 : biome === 'snowRidge' ? 2.2 : biome === 'marsh' ? 0.35 : 1);
+  const boulder = roll > 1 - boulderChance;
   if (boulder) {
     return {
       kind: 'boulder',
@@ -61,12 +65,38 @@ export function itemInCell(
   }
 
   const forest = fbm(x / SCATTER.forestWavelength, z / SCATTER.forestWavelength, 2, seed + 504);
-  const density = SCATTER.treeBase + SCATTER.treeForest * smoothstep(0.05, 0.55, forest);
+  const densityMul =
+    biome === 'pineForest'
+      ? 1.55
+      : biome === 'marsh'
+        ? 0.42
+        : biome === 'rockyHighlands'
+          ? 0.28
+          : biome === 'snowRidge'
+            ? 0.38
+            : biome === 'sandyShore'
+              ? 0.18
+              : biome === 'riverValley'
+                ? 0.72
+                : 0.9;
+  const density = (SCATTER.treeBase + SCATTER.treeForest * smoothstep(0.05, 0.55, forest)) * densityMul;
   if (roll >= density) return null;
   if (h > SCATTER.treeline) return null;
   if (terrain.normal(x, z, tmpNormal).y < SCATTER.maxSlope) return null;
 
-  const kind: ScatterKind = h > 14 || hash2(cx, cz, seed + 507) < 0.45 ? 'pine' : 'tree';
+  const pineChance =
+    biome === 'pineForest'
+      ? 0.88
+      : biome === 'snowRidge'
+        ? 0.78
+        : biome === 'rockyHighlands'
+          ? 0.65
+          : biome === 'marsh' || biome === 'sandyShore'
+            ? 0.18
+            : h > 14
+              ? 0.7
+              : 0.45;
+  const kind: ScatterKind = hash2(cx, cz, seed + 507) < pineChance ? 'pine' : 'tree';
   return {
     kind,
     x,

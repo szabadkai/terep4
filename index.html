@@ -71,6 +71,84 @@
         pointer-events: none;
         white-space: nowrap;
       }
+      .debug-overlay {
+        position: absolute;
+        left: 16px;
+        bottom: 44px;
+        display: none;
+        width: min(520px, calc(100vw - 32px));
+        max-height: calc(100vh - 132px);
+        overflow: auto;
+        box-sizing: border-box;
+        padding: 10px 12px 12px;
+        border-radius: 8px;
+        background: rgba(7, 11, 15, 0.78);
+        color: #e8eef4;
+        font-size: 11px;
+        line-height: 1.25;
+        user-select: none;
+        pointer-events: none;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+      }
+      .debug-overlay.visible {
+        display: block;
+      }
+      .debug-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        color: #ffc63a;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+      .debug-title span {
+        color: rgba(232, 238, 244, 0.62);
+        font-weight: 400;
+        letter-spacing: 0;
+      }
+      .debug-section {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .debug-section h2,
+      .debug-ai h3 {
+        margin: 0 0 6px;
+        font-size: 12px;
+        color: #ffc63a;
+      }
+      .debug-ai {
+        margin-top: 8px;
+      }
+      .debug-ai h3 {
+        display: flex;
+        justify-content: space-between;
+        color: #e8eef4;
+      }
+      .debug-ai h3 span {
+        color: rgba(232, 238, 244, 0.62);
+        font-weight: 400;
+      }
+      .debug-grid {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 3px 10px;
+        align-items: baseline;
+      }
+      .debug-grid span {
+        color: rgba(232, 238, 244, 0.56);
+      }
+      .debug-grid b {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #f5f8fb;
+        font-weight: 600;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
       .hud-race {
         position: absolute;
         top: 16px;
@@ -246,6 +324,60 @@
       @keyframes ui-pulse {
         50% {
           opacity: 0.45;
+        }
+      }
+      @media (max-width: 700px) {
+        .hud-panel {
+          top: 8px;
+          left: 8px;
+          padding: 8px 10px;
+        }
+        .hud-speed {
+          font-size: 24px;
+        }
+        .hud-race {
+          top: 8px;
+          left: auto;
+          right: 8px;
+          transform: none;
+          gap: 8px;
+          padding: 8px 10px;
+        }
+        .hud-arrow {
+          width: 28px;
+          height: 28px;
+        }
+        .hud-time {
+          font-size: 20px;
+        }
+        .hud-cp {
+          font-size: 11px;
+        }
+        .hud-pos {
+          display: none;
+        }
+        .hud-standings {
+          top: 84px;
+          right: 8px;
+          min-width: 132px;
+          font-size: 11px;
+        }
+        .hud-help {
+          right: 8px;
+          bottom: 8px;
+          left: 8px;
+          transform: none;
+          white-space: normal;
+          text-align: center;
+          font-size: 10px;
+        }
+        .debug-overlay {
+          top: 174px;
+          right: 8px;
+          bottom: 56px;
+          left: 8px;
+          width: auto;
+          max-height: calc(100vh - 230px);
         }
       }
     </style>

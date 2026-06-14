@@ -28,6 +28,7 @@ export class KeyboardInput {
   private readonly down = new Set<string>();
   private actionEdge = false;
   private pauseEdge = false;
+  private debugEdge = false;
 
   attach(target: Window): void {
     target.addEventListener('keydown', this.onKey);
@@ -62,6 +63,13 @@ export class KeyboardInput {
     return p;
   }
 
+  /** Returns true once per debug overlay keypress. */
+  takeDebugToggle(): boolean {
+    const d = this.debugEdge;
+    this.debugEdge = false;
+    return d;
+  }
+
   /** Lets the UI layer (e.g. a click on the start screen) inject a confirm. */
   pushAction(): void {
     this.actionEdge = true;
@@ -76,6 +84,7 @@ export class KeyboardInput {
         if (code === 'KeyR') this.state.reset = true;
         if (code === 'Enter') this.actionEdge = true;
         if (code === 'Escape') this.pauseEdge = true;
+        if (code === 'F3') this.debugEdge = true;
       }
       this.down.add(code);
     } else {
@@ -112,4 +121,5 @@ const HANDLED_CODES = new Set([
   'KeyD',
   'KeyR',
   'Enter',
+  'F3',
 ]);

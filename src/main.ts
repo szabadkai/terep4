@@ -18,6 +18,7 @@ import { CheckpointView } from './render/checkpointView';
 import { CameraRig } from './render/cameraRig';
 import { Hud } from './render/hud';
 import { GameUi } from './render/ui';
+import { DebugOverlay } from './render/debugOverlay';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container');
@@ -37,6 +38,7 @@ const checkpointView = new CheckpointView(scene, terrain, world.race.checkpoints
 const cameraRig = new CameraRig(camera, terrain);
 const ui = new GameUi(container, () => input.pushAction());
 const hud = new Hud(container, ui.best);
+const debugOverlay = new DebugOverlay(container);
 
 let started = false;
 let paused = false;
@@ -66,6 +68,7 @@ const loop = new FixedLoop(
       paused = !paused;
       ui.setPaused(paused);
     }
+    if (input.takeDebugToggle()) debugOverlay.toggle();
     if (input.takeReset()) world.resetRequested = true;
 
     if (started && !paused) {
@@ -86,6 +89,7 @@ const loop = new FixedLoop(
 
     forward.set(0, 0, 1).applyQuaternion(vehicleView.group.quaternion);
     hud.update(world.curr, world.raceState, Math.atan2(forward.x, forward.z));
+    debugOverlay.update(world, input.state);
 
     if (world.raceState.phase === 'finished' && !finishShown) {
       finishShown = true;

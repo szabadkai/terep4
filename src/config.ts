@@ -16,6 +16,14 @@ export const SIM = {
 // ---------------------------------------------------------------------------
 
 export type SurfaceId = 'grass' | 'rock' | 'mud' | 'sand' | 'snow' | 'water';
+export type BiomeId =
+  | 'grassland'
+  | 'pineForest'
+  | 'marsh'
+  | 'rockyHighlands'
+  | 'snowRidge'
+  | 'sandyShore'
+  | 'riverValley';
 
 export interface SurfaceParams {
   /** Tire friction coefficient multiplier. */
@@ -347,8 +355,20 @@ export const AI = {
   },
   /** Below this target-speed fraction, don't brake (let it coast/turn). */
   brakeSpeed: 14,
-  /** Look this far past the current checkpoint to smooth the racing line (m). */
-  lookahead: 26,
+  /** Minimum lookahead past the current checkpoint at low speed (m). */
+  lookaheadMin: 16,
+  /** Maximum lookahead past the current checkpoint at high speed (m). */
+  lookaheadMax: 58,
+  /** Speed that reaches maximum checkpoint lookahead (m/s). */
+  lookaheadSpeed: 26,
+  /** Terrain-aware route sampling distance in front of the AI (m). */
+  avoidScanDist: 78,
+  /** Maximum lateral route offset considered to avoid bad terrain (m). */
+  avoidLateralOffset: 54,
+  /** How quickly AI route offset follows the best sampled line (1/s). */
+  avoidOffsetSmoothing: 3.2,
+  /** When already in bad terrain, search this far for a dry exit (m). */
+  escapeScanDist: 64,
   /** Start easing the throttle within this distance of the gate (m)... */
   approachDist: 30,
   /** ...but only when the heading is off by more than this (rad)... */
@@ -358,13 +378,29 @@ export const AI = {
   /** Considered stuck if horizontal speed stays under this (m/s)... */
   stuckSpeed: 1.2,
   /** ...for this long (s); then reverse to unstick. */
-  stuckTime: 1.4,
+  stuckTime: 2.4,
   /** Also reverse when distance to the checkpoint fails to improve this long. */
-  poorProgressTime: 2.2,
+  poorProgressTime: 3.4,
   /** Minimum checkpoint-distance improvement per second before AI worries. */
-  minProgressRate: 0.7,
+  minProgressRate: 0.25,
   /** Duration of the reverse-unstick maneuver (s). */
   unstickTime: 1.1,
+  /** Brief stop before backing out of a stuck state (s). */
+  recoveryPauseTime: 0.28,
+  /** Extra reverse time added for repeated stuck attempts at one checkpoint (s). */
+  recoveryRepeatReverseBonus: 0.22,
+  /** Low-throttle forward crawl after reversing (s). */
+  recoveryCrawlTime: 1.25,
+  /** Forward throttle used during recovery crawl. */
+  recoveryCrawlThrottle: 0.38,
+  /** Reset in place after this many failed recovery attempts at one checkpoint. */
+  recoveryMaxAttemptsPerCheckpoint: 3,
+  /** Local-up dot below this means the AI is nearly upside down. */
+  recoveryRolloverUp: 0.28,
+  /** Time nearly upside down before the AI gives up and resets (s). */
+  recoveryRolloverTime: 1.75,
+  /** Time spent in reset-if-hopeless state after the vehicle reset is applied. */
+  recoveryResetHoldTime: 0.35,
   /** Capture radius for AI checkpoints. Larger than the player's so a fast
    * AI passing near a gate counts it rather than orbiting forever at its
    * minimum turn radius. */
@@ -399,6 +435,15 @@ export const COLORS = {
   } as Record<SurfaceId, number>,
   /** Secondary face tints (see TerrainView.faceColor). */
   grassDry: 0x9fae54,
+  biomeTint: {
+    grassland: 0x78a957,
+    pineForest: 0x315f3d,
+    marsh: 0x536f47,
+    rockyHighlands: 0x827c6e,
+    snowRidge: 0xdce8ef,
+    sandyShore: 0xd0b06f,
+    riverValley: 0x6c8a58,
+  } as Record<BiomeId, number>,
   rockSteep: 0x675d52,
   trunk: 0x5d4630,
   pine: 0x3a6438,

@@ -10,7 +10,7 @@
  */
 
 import { Vec3, smoothstep, lerp } from '../core/math';
-import { WORLD, type SurfaceId } from '../config';
+import { WORLD, type BiomeId, type SurfaceId } from '../config';
 import { fbm, ridgedFbm } from './noise';
 
 export interface HeightSource {
@@ -86,10 +86,38 @@ export class Terrain {
     return out.set(dx, 2 * e, dz).normalize();
   }
 
+  biome(x: number, z: number): BiomeId {
+    const h = this.height(x, z);
+    const r = Math.hypot(x, z);
+    const g = WORLD.gen;
+    if (r < g.spawnFlatOuter * 1.15) return 'grassland';
+
+    const e = NORMAL_EPS;
+    const dx = this.height(x - e, z) - this.height(x + e, z);
+    const dz = this.height(x, z - e) - this.height(x, z + e);
+    const ny = (2 * e) / Math.hypot(dx, 2 * e, dz);
+    const moisture = fbm(x / 320, z / 320, 3, this.seed + 140);
+    const forest = fbm(x / 210 + 2.7, z / 210 - 5.1, 3, this.seed + 141);
+    const ridge = ridgedFbm(x / 480 - 3.2, z / 480 + 1.4, 3, this.seed + 142);
+    const riverNoise = fbm(x / g.riverWavelength, z / g.riverWavelength, 2, this.seed + 30);
+    const nearRiver =
+      Math.abs(riverNoise) < g.riverWidth * 1.65 && r > g.riverFadeStart && r < g.reliefEnd * 1.8;
+
+    if (h > WORLD.snowLine - 3 + moisture * 2) return 'snowRidge';
+    if (nearRiver && h < WORLD.waterLevel + 8) return 'riverValley';
+    if (h < WORLD.waterLevel + 2.2 && moisture < -0.05) return 'sandyShore';
+    if (h < WORLD.waterLevel + 5.2 && moisture > -0.25) return 'marsh';
+    if (ny < WORLD.rockSlope + 0.04 || (h > 15 && ridge > 0.54)) return 'rockyHighlands';
+    if (forest > -0.03 && h < 22 && ny > FOREST_MIN_NORMAL_Y) return 'pineForest';
+    return 'grassland';
+  }
+
   surface(x: number, z: number): SurfaceId {
     const h = this.height(x, z);
     if (h < WORLD.waterLevel) return 'water';
     if (h < WORLD.waterLevel + WORLD.sandShore) return 'sand';
+    const biome = this.biome(x, z);
+    if (biome === 'sandyShore' && h < WORLD.waterLevel + 2.8) return 'sand';
 
     const e = NORMAL_EPS;
     const dx = this.height(x - e, z) - this.height(x + e, z);
@@ -99,11 +127,17 @@ export class Terrain {
 
     const w = WORLD.gen.patchWavelength;
     const patch = fbm(x / w, z / w, 2, this.seed + 777);
-    if (h > WORLD.snowLine + patch * 4) return 'snow';
+    if (h > WORLD.snowLine + patch * 4 || (biome === 'snowRidge' && h > WORLD.snowLine - 5)) {
+      return 'snow';
+    }
     // Mud/rock patches fade out near the spawn so the start is always grass.
     const gate =
       2 * (1 - smoothstep(WORLD.gen.spawnFlatInner, WORLD.gen.spawnFlatOuter, Math.hypot(x, z)));
+    if ((biome === 'marsh' || biome === 'riverValley') && patch > -0.25 + gate && h < 12) {
+      return 'mud';
+    }
     if (patch > 0.5 + gate && h < 18) return 'mud';
+    if (biome === 'rockyHighlands' && patch < 0.2 - gate) return 'rock';
     if (patch < -0.55 - gate) return 'rock';
     return 'grass';
   }
@@ -152,6 +186,8 @@ export class Terrain {
     out.surface = this.surface(out.point.x, out.point.z);
   }
 }
+
+const FOREST_MIN_NORMAL_Y = 0.82;
 
 export function makeRayHit(): RayHit {
   return { distance: 0, point: new Vec3(), normal: new Vec3(0, 1, 0), surface: 'grass' };

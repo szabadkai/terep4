@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three';
-import { CHUNKS, COLORS, WORLD, type SurfaceId } from '../config';
+import { CHUNKS, COLORS, WORLD, type BiomeId, type SurfaceId } from '../config';
 import type { Terrain } from '../terrain/terrain';
 import { hash2, fbm } from '../terrain/noise';
 import { smoothstep } from '../core/math';
@@ -16,6 +16,7 @@ export class TerrainView {
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true });
   private readonly water: THREE.Mesh;
   private readonly surfaceColors: Record<SurfaceId, THREE.Color>;
+  private readonly biomeColors: Record<BiomeId, THREE.Color>;
   private readonly grassDry = new THREE.Color(COLORS.grassDry);
   private readonly rockSteep = new THREE.Color(COLORS.rockSteep);
   private readonly faceTint = new THREE.Color();
@@ -28,6 +29,9 @@ export class TerrainView {
     this.surfaceColors = Object.fromEntries(
       Object.entries(COLORS.surfaces).map(([k, hex]) => [k, new THREE.Color(hex)]),
     ) as Record<SurfaceId, THREE.Color>;
+    this.biomeColors = Object.fromEntries(
+      Object.entries(COLORS.biomeTint).map(([k, hex]) => [k, new THREE.Color(hex)]),
+    ) as Record<BiomeId, THREE.Color>;
 
     const waterSize = (CHUNKS.viewRadius * 2 + 2) * CHUNKS.size * 2;
     this.water = new THREE.Mesh(
@@ -168,7 +172,7 @@ export class TerrainView {
     const mx = (p0[0] + p1[0] + p2[0]) / 3;
     const my = (p0[1] + p1[1] + p2[1]) / 3;
     const mz = (p0[2] + p1[2] + p2[2]) / 3;
-    const color = this.faceColor(this.terrain.surface(mx, mz), mx, my, mz, ny);
+    const color = this.faceColor(this.terrain.surface(mx, mz), this.terrain.biome(mx, mz), mx, my, mz, ny);
     // Deterministic per-face brightness jitter sells the faceted look.
     const jitter =
       1 -
@@ -193,6 +197,7 @@ export class TerrainView {
   /** Surface color varied by moisture noise, altitude, slope and depth. */
   private faceColor(
     surface: SurfaceId,
+    biome: BiomeId,
     mx: number,
     my: number,
     mz: number,
@@ -213,6 +218,17 @@ export class TerrainView {
     } else if (surface === 'snow') {
       c.multiplyScalar(1 - 0.15 * smoothstep(0.9, 0.6, ny));
     }
+    const tintAmount =
+      surface === 'water'
+        ? 0.16
+        : surface === 'snow'
+          ? 0.22
+          : surface === 'rock'
+            ? 0.3
+            : surface === 'sand'
+              ? 0.26
+              : 0.38;
+    c.lerp(this.biomeColors[biome], tintAmount);
     return c;
   }
 }

@@ -8,6 +8,14 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+      },
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
