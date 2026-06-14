@@ -15,7 +15,7 @@ export const SIM = {
 // Surfaces
 // ---------------------------------------------------------------------------
 
-export type SurfaceId = 'grass' | 'rock' | 'mud' | 'snow' | 'water';
+export type SurfaceId = 'grass' | 'rock' | 'mud' | 'sand' | 'snow' | 'water';
 
 export interface SurfaceParams {
   /** Tire friction coefficient multiplier. */
@@ -30,6 +30,7 @@ export const SURFACES: Record<SurfaceId, SurfaceParams> = {
   grass: { friction: 1.0, rollingResistance: 0.015, drag: 0 },
   rock: { friction: 1.1, rollingResistance: 0.008, drag: 0 },
   mud: { friction: 0.55, rollingResistance: 0.05, drag: 60 },
+  sand: { friction: 0.78, rollingResistance: 0.045, drag: 25 },
   snow: { friction: 0.45, rollingResistance: 0.025, drag: 20 },
   water: { friction: 0.4, rollingResistance: 0.04, drag: 320 },
 };
@@ -116,7 +117,7 @@ const WHEEL_RADIUS = 0.37;
 
 export const BUGGY: VehicleConfig = {
   mass: 1200,
-  chassis: { width: 1.7, height: 1.1, length: 3.6, centerY: 0.35 },
+  chassis: { width: 1.7, height: 1.45, length: 3.6, centerY: 0.35 },
   inertiaScale: 1.1,
   engine: { maxForce: 7200, maxSpeed: 38, reverseForce: 4200, maxReverseSpeed: 12 },
   brakes: { force: 2300, handbrakeForce: 3200, handbrakeGrip: 0.5 },
@@ -176,17 +177,28 @@ export const WORLD = {
   snowLine: 26,
   /** Terrain steeper than this (surface normal y below it) reads as rock. */
   rockSlope: 0.78,
-  /** Shoreline band above water level that turns to mud (m). */
-  mudShore: 1.3,
+  /** Shoreline band above water level that turns to sand (m). */
+  sandShore: 1.1,
   gen: {
-    mountainWavelength: 620,
-    mountainAmplitude: 30,
-    hillWavelength: 95,
-    hillAmplitudeMin: 4.5,
-    hillAmplitudeMax: 8,
+    /** Domain warp applied to the large noise layers, for organic shapes. */
+    warpWavelength: 240,
+    warpStrength: 60,
+    /** Ridged-noise mountain ranges. */
+    mountainWavelength: 540,
+    mountainAmplitude: 34,
+    hillWavelength: 110,
+    hillAmplitudeMin: 5,
+    hillAmplitudeMax: 9,
     bumpWavelength: 8,
     bumpAmplitude: 0.5,
-    baseHeight: 2.5,
+    baseHeight: 2.0,
+    /** Winding river channels carved below water level. */
+    riverWavelength: 420,
+    riverWidth: 0.14,
+    riverDepth: 7,
+    /** Rivers fade in between these radii so they skip the spawn pad (m). */
+    riverFadeStart: 60,
+    riverFadeEnd: 160,
     /** Big relief fades in between these radii from the origin (m). */
     reliefStart: 120,
     reliefEnd: 450,
@@ -212,6 +224,126 @@ export const CHUNKS = {
   buildsPerFrame: 1,
 };
 
+export const SCATTER = {
+  /** One scatter candidate per grid cell of this size (m). */
+  cell: 9,
+  /** No scatter inside this radius around the spawn pad (m). */
+  clearRadius: 22,
+  /** Wavelength of the noise that groups trees into forests (m). */
+  forestWavelength: 150,
+  /** Tree probability: baseline + forest bonus. */
+  treeBase: 0.04,
+  treeForest: 0.55,
+  /** Boulders use the top slice of the placement hash. */
+  boulderChance: 0.008,
+  /** No trees above this terrain height (treeline, m). */
+  treeline: 22,
+  /** No trees on slopes steeper than this (surface normal y). */
+  maxSlope: 0.8,
+  /** Collision trunk radius per unit of item size (m). */
+  trunkRadius: 0.16,
+  boulderRadius: 0.62,
+  collision: {
+    stiffness: 70000,
+    damping: 5000,
+    maxForce: 60000,
+    /** The chassis is approximated by two spheres for obstacle hits. */
+    probeRadius: 0.95,
+    probeZ: 1.15,
+    probeY: 0.2,
+  },
+};
+
+export const RACE = {
+  /** Number of checkpoints in one race loop. */
+  checkpointCount: 8,
+  /** Checkpoints sit on a ring of roughly this radius around spawn (m). */
+  ringRadius: 270,
+  /** Random radial variation of checkpoint placement (m). */
+  ringJitter: 80,
+  /** Horizontal distance that counts as passing a checkpoint (m). */
+  captureRadius: 14,
+  /** The race clock starts when speed first exceeds this (m/s). */
+  startSpeed: 0.8,
+  /** Flooded checkpoints get pushed outward in steps this large (m). */
+  landSearchStep: 18,
+  landSearchTries: 40,
+  /** Checkpoints need terrain at least this far above water level (m). */
+  minLandHeight: 0.6,
+};
+
+// ---------------------------------------------------------------------------
+// AI opponents
+// ---------------------------------------------------------------------------
+
+export interface OpponentSpec {
+  name: string;
+  /** Body paint color. */
+  color: number;
+  /** Lateral offset from the start line, so cars don't stack (m). */
+  startOffset: number;
+  /** 0..1 skill: scales target speed and steering precision. */
+  skill: number;
+  /** Engine power multiplier vs. the player buggy. */
+  power: number;
+  /** Top-speed multiplier vs. the player buggy. */
+  topSpeed: number;
+}
+
+export const OPPONENTS: OpponentSpec[] = [
+  { name: 'Sárkány', color: 0x3b7dd8, startOffset: -3.2, skill: 0.96, power: 1.04, topSpeed: 1.02 },
+  { name: 'Borz', color: 0x4caf50, startOffset: 3.2, skill: 0.9, power: 1.0, topSpeed: 1.0 },
+  {
+    name: 'Vaddisznó',
+    color: 0xe0a32e,
+    startOffset: -6.4,
+    skill: 0.84,
+    power: 0.97,
+    topSpeed: 0.97,
+  },
+];
+
+/** Derive an opponent's vehicle config from the player buggy + its spec. */
+export function opponentConfig(spec: OpponentSpec): VehicleConfig {
+  return {
+    ...BUGGY,
+    engine: {
+      ...BUGGY.engine,
+      maxForce: BUGGY.engine.maxForce * spec.power,
+      maxSpeed: BUGGY.engine.maxSpeed * spec.topSpeed,
+    },
+  };
+}
+
+export const AI = {
+  /** Steering gain: target steer = clamp(gain * bearingError). */
+  steerGain: 2.2,
+  /** Ease off throttle when |bearing error| exceeds this (rad). */
+  cautionAngle: 0.5,
+  /** Brake when |bearing error| exceeds this and moving fast (rad). */
+  brakeAngle: 1.1,
+  /** Below this target-speed fraction, don't brake (let it coast/turn). */
+  brakeSpeed: 14,
+  /** Look this far past the current checkpoint to smooth the racing line (m). */
+  lookahead: 26,
+  /** Start easing the throttle within this distance of the gate (m)... */
+  approachDist: 30,
+  /** ...but only when the heading is off by more than this (rad)... */
+  approachAngle: 0.35,
+  /** ...down to at most this throttle fraction, so the turn radius tucks in. */
+  approachThrottle: 0.4,
+  /** Considered stuck if horizontal speed stays under this (m/s)... */
+  stuckSpeed: 1.2,
+  /** ...for this long (s); then reverse to unstick. */
+  stuckTime: 1.4,
+  /** Duration of the reverse-unstick maneuver (s). */
+  unstickTime: 1.1,
+  /** Capture radius for AI checkpoints. Larger than the player's so a fast
+   * AI passing near a gate counts it rather than orbiting forever at its
+   * minimum turn radius. */
+  captureRadius: 22,
+};
+
 export const CAMERA = {
   fov: 70,
   distance: 8.5,
@@ -234,9 +366,17 @@ export const COLORS = {
     grass: 0x69a04a,
     rock: 0x8b8275,
     mud: 0x6e5639,
+    sand: 0xd6bd85,
     snow: 0xe9eef3,
     water: 0x7c6f52, // lake/river bed shows through the water plane
   } as Record<SurfaceId, number>,
+  /** Secondary face tints (see TerrainView.faceColor). */
+  grassDry: 0x9fae54,
+  rockSteep: 0x675d52,
+  trunk: 0x5d4630,
+  pine: 0x3a6438,
+  leaf: 0x55903d,
+  boulder: 0x8a857c,
   water: 0x3a7ba6,
   waterOpacity: 0.75,
   fog: 0xcfe0ea,
@@ -244,9 +384,15 @@ export const COLORS = {
   skyZenith: 0x6fa8d6,
   hemiSky: 0xbfd8e8,
   hemiGround: 0x6a7a5a,
-  body: 0xc8472f,
-  cabin: 0x2c3c4c,
-  wheel: 0x222222,
+  body: 0xb13325,
+  glass: 0x18242f,
+  trim: 0x23292f,
+  headlight: 0xffd97a,
+  taillight: 0x7e1c10,
+  wheel: 0x1d1d1f,
+  hub: 0x9aa0a6,
+  checkpointNext: 0xffc63a,
+  checkpointFar: 0x9fb4c8,
   fogNear: 130,
   fogFar: 390,
   /** Per-face brightness jitter for the low-poly look (fraction). */

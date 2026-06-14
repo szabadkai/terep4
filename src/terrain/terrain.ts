@@ -11,7 +11,7 @@
 
 import { Vec3, smoothstep, lerp } from '../core/math';
 import { WORLD, type SurfaceId } from '../config';
-import { fbm } from './noise';
+import { fbm, ridgedFbm } from './noise';
 
 export interface HeightSource {
   height(x: number, z: number): number;
@@ -26,17 +26,31 @@ export class NoiseHeightSource implements HeightSource {
     // Large relief fades in away from the spawn so the start area is drivable.
     const relief = smoothstep(g.reliefStart, g.reliefEnd, r);
 
+    // Domain warp makes ridges and valleys bend instead of following the grid.
+    const wx =
+      x + g.warpStrength * fbm(x / g.warpWavelength, z / g.warpWavelength, 2, this.seed + 11);
+    const wz =
+      z +
+      g.warpStrength *
+        fbm(x / g.warpWavelength + 5.2, z / g.warpWavelength - 3.1, 2, this.seed + 12);
+
     const mountains =
-      fbm(x / g.mountainWavelength, z / g.mountainWavelength, 4, this.seed) *
+      ridgedFbm(wx / g.mountainWavelength, wz / g.mountainWavelength, 4, this.seed) *
       g.mountainAmplitude *
-      (0.3 + 0.7 * relief);
+      (0.22 + 0.78 * relief);
     const hills =
-      fbm(x / g.hillWavelength + 7.3, z / g.hillWavelength - 2.1, 4, this.seed + 50) *
+      fbm(wx / g.hillWavelength + 7.3, wz / g.hillWavelength - 2.1, 4, this.seed + 50) *
       lerp(g.hillAmplitudeMin, g.hillAmplitudeMax, relief);
     const bumps =
       fbm(x / g.bumpWavelength, z / g.bumpWavelength, 2, this.seed + 90) * g.bumpAmplitude;
 
-    let h = mountains + hills + bumps + g.baseHeight;
+    // Winding channels carved below water level; dry canyons through ridges.
+    const riverNoise = fbm(x / g.riverWavelength, z / g.riverWavelength, 2, this.seed + 30);
+    const river =
+      (1 - smoothstep(0.02, g.riverWidth, Math.abs(riverNoise))) *
+      smoothstep(g.riverFadeStart, g.riverFadeEnd, r);
+
+    let h = mountains + hills + bumps + g.baseHeight - river * (g.riverDepth + mountains * 0.45);
     // Blend toward a nearly-flat pad at the spawn point.
     const pad = 1 - smoothstep(g.spawnFlatInner, g.spawnFlatOuter, r);
     h = lerp(h, g.spawnHeight + bumps * g.spawnBumpScale, pad);
@@ -75,7 +89,7 @@ export class Terrain {
   surface(x: number, z: number): SurfaceId {
     const h = this.height(x, z);
     if (h < WORLD.waterLevel) return 'water';
-    if (h < WORLD.waterLevel + WORLD.mudShore) return 'mud';
+    if (h < WORLD.waterLevel + WORLD.sandShore) return 'sand';
 
     const e = NORMAL_EPS;
     const dx = this.height(x - e, z) - this.height(x + e, z);

@@ -71,6 +71,183 @@
         pointer-events: none;
         white-space: nowrap;
       }
+      .hud-race {
+        position: absolute;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        padding: 10px 16px;
+        border-radius: 8px;
+        background: rgba(10, 16, 22, 0.55);
+        color: #e8eef4;
+        user-select: none;
+        pointer-events: none;
+      }
+      .hud-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        color: #ffc63a;
+        transform-origin: 50% 50%;
+        transition: transform 90ms linear;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+      }
+      .hud-arrow svg {
+        display: block;
+      }
+      .hud-time {
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+      .hud-cp {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      .hud-pos {
+        margin-left: 6px;
+        padding-left: 12px;
+        border-left: 1px solid rgba(255, 255, 255, 0.18);
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1;
+        color: #e8eef4;
+      }
+      .hud-pos small {
+        font-size: 12px;
+        font-weight: 400;
+        opacity: 0.7;
+      }
+      .hud-pos-lead {
+        color: #ffc63a;
+      }
+      .hud-standings {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(10, 16, 22, 0.55);
+        color: #e8eef4;
+        font-size: 12px;
+        user-select: none;
+        pointer-events: none;
+        min-width: 150px;
+      }
+      .hud-stand {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 0;
+        opacity: 0.82;
+      }
+      .hud-stand-you {
+        opacity: 1;
+        font-weight: 700;
+      }
+      .hud-rank {
+        width: 12px;
+        text-align: right;
+        opacity: 0.7;
+      }
+      .hud-sw {
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        flex: 0 0 auto;
+      }
+      .hud-sw-you {
+        background: #b13325;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+      }
+      .hud-name {
+        flex: 1 1 auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .hud-detail {
+        opacity: 0.75;
+        font-variant-numeric: tabular-nums;
+      }
+      .ui-overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        background: rgba(8, 13, 18, 0.62);
+        color: #e8eef4;
+        user-select: none;
+        cursor: pointer;
+      }
+      .ui-overlay.visible {
+        display: flex;
+      }
+      .ui-overlay h1 {
+        font-size: 56px;
+        letter-spacing: 0.18em;
+        margin: 0 0 4px;
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+      }
+      .ui-tag {
+        margin: 0 0 24px;
+        opacity: 0.8;
+        letter-spacing: 0.08em;
+      }
+      .ui-place {
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        margin: 0;
+      }
+      .ui-time {
+        font-size: 44px;
+        font-weight: 700;
+        margin: 4px 0;
+        color: #ffc63a;
+      }
+      .ui-controls {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 6px 18px;
+        font-size: 14px;
+        margin-bottom: 22px;
+      }
+      .ui-controls span:nth-child(odd) {
+        text-align: right;
+        font-weight: 700;
+        color: #ffc63a;
+      }
+      .ui-controls span:nth-child(even) {
+        text-align: left;
+        opacity: 0.85;
+      }
+      .ui-hint {
+        max-width: 440px;
+        font-size: 13px;
+        opacity: 0.7;
+        margin: 0 16px 26px;
+      }
+      .ui-action {
+        font-size: 15px;
+        letter-spacing: 0.1em;
+        color: #ffc63a;
+        animation: ui-pulse 1.6s ease-in-out infinite;
+        margin: 0;
+      }
+      @keyframes ui-pulse {
+        50% {
+          opacity: 0.45;
+        }
+      }
     </style>
   </head>
   <body>

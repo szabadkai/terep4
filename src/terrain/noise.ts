@@ -44,3 +44,20 @@ export function fbm(x: number, z: number, octaves: number, seed: number): number
   }
   return sum / norm;
 }
+
+/** Ridged fbm in ~[0, 1]: sharp crests where the noise crosses zero. */
+export function ridgedFbm(x: number, z: number, octaves: number, seed: number): number {
+  let amplitude = 1;
+  let frequency = 1;
+  let sum = 0;
+  let norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    let n = 1 - Math.abs(valueNoise(x * frequency, z * frequency, seed + i * 131));
+    n *= n;
+    sum += n * amplitude;
+    norm += amplitude;
+    amplitude *= 0.5;
+    frequency *= 2.07;
+  }
+  return sum / norm;
+}

@@ -8,13 +8,17 @@
 import * as THREE from 'three';
 import { CHUNKS, COLORS, WORLD, type SurfaceId } from '../config';
 import type { Terrain } from '../terrain/terrain';
-import { hash2 } from '../terrain/noise';
+import { hash2, fbm } from '../terrain/noise';
+import { smoothstep } from '../core/math';
 
 export class TerrainView {
   private readonly chunks = new Map<string, THREE.Mesh>();
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true });
   private readonly water: THREE.Mesh;
   private readonly surfaceColors: Record<SurfaceId, THREE.Color>;
+  private readonly grassDry = new THREE.Color(COLORS.grassDry);
+  private readonly rockSteep = new THREE.Color(COLORS.rockSteep);
+  private readonly faceTint = new THREE.Color();
   private initialBuildDone = false;
 
   constructor(
@@ -162,8 +166,9 @@ export class TerrainView {
     nz /= len;
 
     const mx = (p0[0] + p1[0] + p2[0]) / 3;
+    const my = (p0[1] + p1[1] + p2[1]) / 3;
     const mz = (p0[2] + p1[2] + p2[2]) / 3;
-    const color = this.surfaceColors[this.terrain.surface(mx, mz)];
+    const color = this.faceColor(this.terrain.surface(mx, mz), mx, my, mz, ny);
     // Deterministic per-face brightness jitter sells the faceted look.
     const jitter =
       1 -
@@ -183,5 +188,31 @@ export class TerrainView {
       v += 3;
     }
     return v;
+  }
+
+  /** Surface color varied by moisture noise, altitude, slope and depth. */
+  private faceColor(
+    surface: SurfaceId,
+    mx: number,
+    my: number,
+    mz: number,
+    ny: number,
+  ): THREE.Color {
+    const c = this.faceTint.copy(this.surfaceColors[surface]);
+    if (surface === 'grass') {
+      // Patches of dry, yellowed grass; slightly darker with altitude.
+      const dry = 0.5 + 0.5 * fbm(mx / 75, mz / 75, 2, 71);
+      c.lerp(this.grassDry, 0.6 * dry);
+      c.multiplyScalar(1 - 0.18 * smoothstep(12, 24, my));
+    } else if (surface === 'rock') {
+      // Steeper faces read darker, like exposed strata.
+      c.lerp(this.rockSteep, 0.7 * smoothstep(0.85, 0.5, ny));
+    } else if (surface === 'water') {
+      // Lake and river beds darken with depth.
+      c.multiplyScalar(Math.max(0.45, 1 + (my - WORLD.waterLevel) * 0.12));
+    } else if (surface === 'snow') {
+      c.multiplyScalar(1 - 0.15 * smoothstep(0.9, 0.6, ny));
+    }
+    return c;
   }
 }

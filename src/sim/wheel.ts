@@ -110,13 +110,15 @@ export class Wheel {
     body.applyForce(force, this.hit.point);
 
     // --- Tire frame: wheel forward projected onto the contact plane.
+    // Chassis space is +Z forward, +Y up, so the car's right side is -X:
+    // positive steer must swing the wheel toward -X.
     const n = this.hit.normal;
-    fwLocal.set(Math.sin(this.steer), 0, Math.cos(this.steer));
+    fwLocal.set(-Math.sin(this.steer), 0, Math.cos(this.steer));
     body.localDirToWorld(fwLocal, fw);
     fw.addScaled(n, -fw.dot(n));
     if (fw.lengthSq() < 1e-6) return; // wheel axis ~ parallel to normal; no tire force
     fw.normalize();
-    right.crossOf(n, fw);
+    right.crossOf(fw, n);
 
     body.velocityAt(this.hit.point, vContact);
     const vLong = vContact.dot(fw);

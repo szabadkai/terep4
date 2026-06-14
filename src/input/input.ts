@@ -26,6 +26,8 @@ export class KeyboardInput {
   };
 
   private readonly down = new Set<string>();
+  private actionEdge = false;
+  private pauseEdge = false;
 
   attach(target: Window): void {
     target.addEventListener('keydown', this.onKey);
@@ -46,12 +48,35 @@ export class KeyboardInput {
     return r;
   }
 
+  /** Returns true once per Enter keypress (menu confirm / race restart). */
+  takeAction(): boolean {
+    const a = this.actionEdge;
+    this.actionEdge = false;
+    return a;
+  }
+
+  /** Returns true once per Escape keypress. */
+  takePause(): boolean {
+    const p = this.pauseEdge;
+    this.pauseEdge = false;
+    return p;
+  }
+
+  /** Lets the UI layer (e.g. a click on the start screen) inject a confirm. */
+  pushAction(): void {
+    this.actionEdge = true;
+  }
+
   private onKey = (e: KeyboardEvent): void => {
     const pressed = e.type === 'keydown';
     const code = e.code;
     if (HANDLED_CODES.has(code)) e.preventDefault();
     if (pressed) {
-      if (code === 'KeyR' && !this.down.has(code)) this.state.reset = true;
+      if (!this.down.has(code)) {
+        if (code === 'KeyR') this.state.reset = true;
+        if (code === 'Enter') this.actionEdge = true;
+        if (code === 'Escape') this.pauseEdge = true;
+      }
       this.down.add(code);
     } else {
       this.down.delete(code);
@@ -86,4 +111,5 @@ const HANDLED_CODES = new Set([
   'KeyS',
   'KeyD',
   'KeyR',
+  'Enter',
 ]);

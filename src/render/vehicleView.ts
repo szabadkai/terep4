@@ -1,13 +1,14 @@
 /**
- * Low-poly buggy visuals. Consumes interpolated sim snapshots — chassis
- * pose, per-wheel suspension length, steer and spin — and never writes back
- * to the sim. The visible suspension travel is the point of the exercise.
+ * Vehicle visuals: the lofted jeep body (see jeepModel.ts), wheels with
+ * visible suspension travel, and a blob shadow. Consumes interpolated sim
+ * snapshots and never writes back to the sim.
  */
 
 import * as THREE from 'three';
 import { BUGGY, COLORS } from '../config';
 import type { VehicleSnapshot } from '../sim/snapshot';
 import type { Terrain } from '../terrain/terrain';
+import { buildJeep } from './jeepModel';
 
 const TWO_PI = Math.PI * 2;
 
@@ -30,8 +31,9 @@ export class VehicleView {
   constructor(
     scene: THREE.Scene,
     private readonly terrain: Terrain,
+    bodyColor?: number,
   ) {
-    this.buildChassis();
+    this.group.add(buildJeep(bodyColor));
     this.buildWheels();
     scene.add(this.group);
 
@@ -67,7 +69,9 @@ export class VehicleView {
       const wc = curr.wheels[i];
       const steerGroup = this.steerGroups[i];
       steerGroup.position.y = BUGGY.wheels[i].offset.y - lerp(wp.suspLen, wc.suspLen);
-      steerGroup.rotation.y = lerpAngle(wp.steer, wc.steer, alpha);
+      // Positive sim steer points the wheel toward -X (car right), which is
+      // a negative yaw rotation in Three's convention.
+      steerGroup.rotation.y = -lerpAngle(wp.steer, wc.steer, alpha);
       this.wheelMeshes[i].rotation.x = lerpAngle(wp.spin, wc.spin, alpha);
     }
 
@@ -84,44 +88,24 @@ export class VehicleView {
     this.shadow.visible = fade > 0.01;
   }
 
-  private buildChassis(): void {
-    const { width, height, length, centerY } = BUGGY.chassis;
-    const bodyMat = new THREE.MeshLambertMaterial({ color: COLORS.body, flatShading: true });
-    const cabinMat = new THREE.MeshLambertMaterial({ color: COLORS.cabin, flatShading: true });
-
-    const body = new THREE.Mesh(new THREE.BoxGeometry(width, height * 0.5, length), bodyMat);
-    body.position.y = centerY - height * 0.1;
-    this.group.add(body);
-
-    const cabin = new THREE.Mesh(
-      new THREE.BoxGeometry(width * 0.78, height * 0.45, length * 0.4),
-      cabinMat,
-    );
-    cabin.position.set(0, centerY + height * 0.32, -length * 0.08);
-    this.group.add(cabin);
-
-    const bumper = new THREE.Mesh(
-      new THREE.BoxGeometry(width * 0.9, height * 0.22, 0.22),
-      cabinMat,
-    );
-    bumper.position.set(0, centerY - height * 0.22, length / 2 + 0.08);
-    this.group.add(bumper);
-  }
-
   private buildWheels(): void {
-    const geometry = new THREE.CylinderGeometry(1, 1, 1, 9);
-    geometry.rotateZ(Math.PI / 2); // axle along X
-    const material = new THREE.MeshLambertMaterial({ color: COLORS.wheel, flatShading: true });
+    const tireGeo = new THREE.CylinderGeometry(1, 1, 1, 9);
+    tireGeo.rotateZ(Math.PI / 2); // axle along X
+    const hubGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.06, 9);
+    hubGeo.rotateZ(Math.PI / 2);
+    const tireMat = new THREE.MeshLambertMaterial({ color: COLORS.wheel, flatShading: true });
+    const hubMat = new THREE.MeshLambertMaterial({ color: COLORS.hub, flatShading: true });
 
     for (const w of BUGGY.wheels) {
       const steerGroup = new THREE.Group();
       steerGroup.position.set(w.offset.x, w.offset.y, w.offset.z);
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.scale.set(0.3, w.radius, w.radius);
-      steerGroup.add(mesh);
+      const tire = new THREE.Mesh(tireGeo, tireMat);
+      tire.scale.set(0.3, w.radius, w.radius);
+      tire.add(new THREE.Mesh(hubGeo, hubMat));
+      steerGroup.add(tire);
       this.group.add(steerGroup);
       this.steerGroups.push(steerGroup);
-      this.wheelMeshes.push(mesh);
+      this.wheelMeshes.push(tire);
     }
   }
 }

@@ -10,6 +10,7 @@ import type { InputState } from '../input/input';
 import type { Terrain } from '../terrain/terrain';
 import { RigidBody, boxInertia } from './rigidbody';
 import { Wheel } from './wheel';
+import { applyObstacleForces } from './obstacles';
 
 const Y_AXIS = new Vec3(0, 1, 0);
 const localForward = new Vec3(0, 0, 1);
@@ -105,6 +106,7 @@ export class Vehicle {
     }
 
     this.chassisContacts(dt);
+    applyObstacleForces(body, this.terrain, dt);
 
     const speed = body.vel.length();
     if (speed > 1e-3) {
