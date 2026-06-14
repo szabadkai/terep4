@@ -170,7 +170,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** None
 
-### [ ] Add Tire Tracks Or Temporary Ground Marks
+### [x] Add Tire Tracks Or Temporary Ground Marks
 
 **Goal:** Make driving leave visible traces.
 

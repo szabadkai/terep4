@@ -20,6 +20,7 @@ import { Hud } from './render/hud';
 import { GameUi } from './render/ui';
 import { DebugOverlay } from './render/debugOverlay';
 import { WheelParticles } from './render/wheelParticles';
+import { TireTracks } from './render/tireTracks';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container');
@@ -37,6 +38,7 @@ const vehicleView = new VehicleView(scene, terrain);
 const opponentViews = world.racerViews.map((rv) => new VehicleView(scene, terrain, rv.spec.color));
 const checkpointView = new CheckpointView(scene, terrain, world.race.checkpoints);
 const wheelParticles = new WheelParticles(scene, terrain);
+const tireTracks = new TireTracks(scene, terrain);
 const cameraRig = new CameraRig(camera, terrain);
 const ui = new GameUi(container, () => input.pushAction());
 const hud = new Hud(container, ui.best);
@@ -84,9 +86,12 @@ const loop = new FixedLoop(
       opponentViews[i].update(world.racerViews[i].prev, world.racerViews[i].curr, alpha);
     }
     wheelParticles.update(frameDt);
+    tireTracks.update(frameDt);
     wheelParticles.emitVehicle(0, vehicleView, world.curr, frameDt);
+    tireTracks.emitVehicle(0, vehicleView, world.curr);
     for (let i = 0; i < opponentViews.length; i++) {
       wheelParticles.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr, frameDt);
+      tireTracks.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr);
     }
     terrainView.update(vehicleView.group.position.x, vehicleView.group.position.z);
     scatterView.update(vehicleView.group.position.x, vehicleView.group.position.z);
@@ -121,5 +126,6 @@ if (import.meta.env.DEV) {
     terrain,
     forEachItemNear,
     wheelParticles,
+    tireTracks,
   };
 }
