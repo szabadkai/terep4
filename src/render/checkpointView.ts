@@ -215,7 +215,11 @@ export class CheckpointView {
   }
 
   private updatePassBursts(state: RaceState): void {
-    if (state.phase === 'ready' && this.previousPhase !== 'ready') {
+    if (
+      state.current < this.previousCurrent ||
+      ((state.phase === 'ready' || state.phase === 'countdown') &&
+        this.previousPhase === 'finished')
+    ) {
       for (const gate of this.gates) {
         gate.burstTime = 0;
         gate.burstGroup.visible = false;

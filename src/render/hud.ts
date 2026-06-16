@@ -92,7 +92,10 @@ export class Hud {
     this.surfaceEl.textContent = snap.surface ? SURFACE_LABELS[snap.surface] : 'Airborne';
     this.slideEl.style.visibility = snap.sliding ? 'visible' : 'hidden';
 
-    this.timeEl.textContent = formatTime(race.finishTime ?? race.elapsed);
+    this.timeEl.textContent =
+      race.phase === 'countdown'
+        ? `${Math.ceil(race.countdownRemaining)}`
+        : formatTime(race.finishTime ?? race.elapsed);
     if (race.next) {
       const dx = race.next.x - snap.pos.x;
       const dz = race.next.z - snap.pos.z;
@@ -100,7 +103,10 @@ export class Hud {
       const rel = bearing - carYaw;
       this.arrowEl.style.transform = `rotate(${(-rel * 180) / Math.PI}deg)`;
       this.arrowEl.style.visibility = 'visible';
-      this.cpEl.textContent = `CP ${race.current + 1}/${race.count} · ${Math.round(Math.hypot(dx, dz))}m`;
+      this.cpEl.textContent =
+        race.phase === 'countdown'
+          ? `STARTING · CP ${race.current + 1}/${race.count}`
+          : `CP ${race.current + 1}/${race.count} · ${Math.round(Math.hypot(dx, dz))}m`;
     } else {
       this.arrowEl.style.visibility = 'hidden';
       this.cpEl.textContent = race.phase === 'finished' ? 'FINISHED' : `CP -/${race.count}`;

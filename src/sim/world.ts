@@ -41,6 +41,7 @@ export class SimWorld {
     current: 0,
     count: 0,
     elapsed: 0,
+    countdownRemaining: 0,
     finishTime: null,
     next: null,
     position: 1,
@@ -91,17 +92,20 @@ export class SimWorld {
       this.vehicle.reset(0, 0, 0);
     }
 
+    const raceWasRunning = this.race.phase === 'running';
+    const effectiveInput = raceWasRunning ? input : NEUTRAL_INPUT;
+
     copySnapshot(this.curr, this.prev);
-    this.vehicle.step(input, dt);
+    this.vehicle.step(effectiveInput, dt);
     fillSnapshot(this.vehicle, this.curr);
 
-    // Horizontal speed only, so settling after a reset can't start the clock.
-    const { pos, vel } = this.vehicle.body;
-    this.race.step(dt, pos.x, pos.z, Math.hypot(vel.x, vel.z));
+    // The race object owns countdown and elapsed-time transitions.
+    const { pos } = this.vehicle.body;
+    this.race.step(dt, pos.x, pos.z);
     this.race.fillState(this.raceState);
 
-    // AI opponents race once the clock is running (or already finished).
-    const running = this.race.phase === 'running';
+    // AI opponents race on the same fixed tick as the player after countdown.
+    const running = raceWasRunning;
     for (let i = 0; i < this.racers.length; i++) {
       const view = this.racerViews[i];
       copySnapshot(view.curr, view.prev);
@@ -123,6 +127,12 @@ export class SimWorld {
       fillSnapshot(this.racers[i].vehicle, this.racerViews[i].curr);
       copySnapshot(this.racerViews[i].curr, this.racerViews[i].prev);
     }
+    this.race.fillState(this.raceState);
+    this.updateStandings();
+  }
+
+  startCountdown(): void {
+    this.race.startCountdown();
     this.race.fillState(this.raceState);
     this.updateStandings();
   }

@@ -68,6 +68,7 @@ const loop = new FixedLoop(
       if (!started) {
         started = true;
         ui.hideStart();
+        world.startCountdown();
         audio.start();
         needsRender = true;
       } else if (paused) {
@@ -77,6 +78,7 @@ const loop = new FixedLoop(
         needsRender = true;
       } else if (world.raceState.phase === 'finished') {
         world.restartRace();
+        world.startCountdown();
         finishShown = false;
         ui.hideFinish();
         hud.setBest(ui.best);
@@ -135,13 +137,10 @@ const loop = new FixedLoop(
 
     if (world.raceState.phase === 'finished' && !finishShown) {
       finishShown = true;
-      ui.showFinish(
-        world.raceState.finishTime ?? 0,
-        world.raceState.position,
-        world.raceState.total,
-      );
+      ui.showFinish(world.raceState);
       audio.pause();
     }
+    ui.updateCountdown(world.raceState);
 
     audio.update(world.curr, world.raceState, frameDt);
 

@@ -6,6 +6,7 @@
 
 import { formatTime } from './hud';
 import type { AudioSettings } from './audio';
+import type { RaceState, Standing } from '../sim/race';
 
 const BEST_KEY = 'mud.best';
 const LEGACY_BEST_KEY = 'terep4.best';
@@ -22,6 +23,7 @@ function saveBest(seconds: number): void {
 
 export class GameUi {
   private readonly startEl: HTMLElement;
+  private readonly countdownEl: HTMLElement;
   private readonly pauseEl: HTMLElement;
   private readonly finishEl: HTMLElement;
   best: number | null = loadBest();
@@ -55,11 +57,12 @@ export class GameUi {
       <p class="ui-action">press ENTER or Esc to resume</p>
     `,
     );
+    this.countdownEl = overlay(container, '<h1 class="ui-countdown">3</h1>');
     this.finishEl = overlay(container, '');
     audioSettingsPanel(container, audioSettings, onAudioSettings);
     this.startEl.classList.add('visible');
 
-    for (const el of [this.startEl, this.pauseEl, this.finishEl]) {
+    for (const el of [this.startEl, this.countdownEl, this.pauseEl, this.finishEl]) {
       el.addEventListener('click', onConfirm);
     }
   }
@@ -72,8 +75,20 @@ export class GameUi {
     this.pauseEl.classList.toggle('visible', paused);
   }
 
-  /** `position`/`total` give the player's finishing place against the AI. */
-  showFinish(timeSec: number, position: number, total: number): void {
+  updateCountdown(race: RaceState): void {
+    const visible = race.phase === 'countdown';
+    this.countdownEl.classList.toggle('visible', visible);
+    if (!visible) return;
+    const count = Math.max(1, Math.ceil(race.countdownRemaining));
+    this.countdownEl.innerHTML = `
+      <h1 class="ui-countdown">${count}</h1>
+      <p class="ui-tag">hold steady</p>
+    `;
+  }
+
+  showFinish(race: RaceState): void {
+    const timeSec = race.finishTime ?? race.elapsed;
+    const position = race.position;
     const isBest = this.best === null || timeSec < this.best;
     if (isBest) {
       this.best = timeSec;
@@ -83,11 +98,18 @@ export class GameUi {
     const placeNote =
       position === 1
         ? 'you won the race!'
-        : `${ordinal} of ${total} · ${isBest ? 'new best!' : `best ${formatTime(this.best!)}`}`;
+        : `${ordinal} of ${race.total} · ${isBest ? 'new best!' : `best ${formatTime(this.best!)}`}`;
     this.finishEl.innerHTML = `
       <h1>${position === 1 ? 'WINNER' : 'FINISH'}</h1>
       <p class="ui-place">${ordinal}</p>
       <p class="ui-time">${formatTime(timeSec)}</p>
+      <div class="ui-summary">
+        <span>${race.count}/${race.count} checkpoints</span>
+        <span>${formatTime(race.elapsed)} elapsed</span>
+      </div>
+      <div class="ui-results">
+        ${race.standings.map((standing, index) => resultRow(standing, index, race.count)).join('')}
+      </div>
       <p class="ui-tag">${placeNote}</p>
       <p class="ui-action">press ENTER for a new race</p>
     `;
@@ -96,6 +118,7 @@ export class GameUi {
 
   hideFinish(): void {
     this.finishEl.classList.remove('visible');
+    this.countdownEl.classList.remove('visible');
   }
 }
 
@@ -153,4 +176,34 @@ function overlay(container: HTMLElement, html: string): HTMLElement {
   el.innerHTML = html;
   container.appendChild(el);
   return el;
+}
+
+function resultRow(standing: Standing, index: number, checkpointCount: number): string {
+  const time = standing.finished
+    ? formatTime(standing.time ?? 0)
+    : `CP ${Math.min(standing.progress, checkpointCount)}/${checkpointCount}`;
+  return `
+    <div class="ui-result${standing.isPlayer ? ' ui-result-you' : ''}">
+      <span>${index + 1}</span>
+      <b>${escapeHtml(standing.name)}</b>
+      <span>${time}</span>
+    </div>
+  `;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      default:
+        return '&#39;';
+    }
+  });
 }

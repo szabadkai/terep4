@@ -335,6 +335,51 @@
         margin: 4px 0;
         color: #ffc63a;
       }
+      .ui-countdown {
+        font-size: 96px;
+        line-height: 0.95;
+        margin-bottom: 10px;
+        color: #ffc63a;
+      }
+      .ui-summary {
+        display: flex;
+        gap: 18px;
+        justify-content: center;
+        margin: 6px 0 14px;
+        color: rgba(232, 238, 244, 0.78);
+        font-size: 13px;
+      }
+      .ui-results {
+        display: grid;
+        gap: 4px;
+        width: min(360px, calc(100vw - 36px));
+        margin: 0 0 18px;
+        font-size: 13px;
+      }
+      .ui-result {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr) 76px;
+        gap: 8px;
+        align-items: center;
+        padding: 5px 8px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .ui-result span {
+        color: rgba(232, 238, 244, 0.72);
+        font-variant-numeric: tabular-nums;
+      }
+      .ui-result span:last-child {
+        text-align: right;
+      }
+      .ui-result b {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ui-result-you {
+        background: rgba(255, 198, 58, 0.18);
+      }
       .ui-controls {
         display: grid;
         grid-template-columns: auto auto;

@@ -431,7 +431,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 
 ## Milestone 5: Race Flow And UX
 
-### [ ] Add Countdown Start
+### [x] Add Countdown Start
 
 **Goal:** Make race starts feel deliberate and fair.
 
@@ -451,7 +451,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** None
 
-### [ ] Add Finish Results Screen
+### [x] Add Finish Results Screen
 
 **Goal:** Give closure and useful feedback after a race.
 

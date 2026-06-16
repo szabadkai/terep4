@@ -53,6 +53,7 @@ export class DebugOverlay {
       <div class="debug-title">DEBUG <span>F3</span></div>
       <div class="debug-grid">
         <span>phase</span><b>${race.phase}</b>
+        <span>countdown</span><b>${race.countdownRemaining.toFixed(1)}s</b>
         <span>time</span><b>${formatTime(race.finishTime ?? race.elapsed)}</b>
         <span>position</span><b>${race.position}/${race.total}</b>
         <span>checkpoint</span><b>${Math.min(race.current + 1, race.count)}/${race.count}</b>

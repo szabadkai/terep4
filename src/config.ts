@@ -278,8 +278,8 @@ export const RACE = {
   ringJitter: 80,
   /** Horizontal distance that counts as passing a checkpoint (m). */
   captureRadius: 14,
-  /** The race clock starts when speed first exceeds this (m/s). */
-  startSpeed: 0.8,
+  /** Seconds between leaving the start screen and releasing throttle control. */
+  countdownSeconds: 3,
   /** Flooded checkpoints get pushed outward in steps this large (m). */
   landSearchStep: 18,
   landSearchTries: 40,

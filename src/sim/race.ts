@@ -1,7 +1,7 @@
 /**
  * Checkpoint race, Terep2-style: a deterministic loop of checkpoints around
- * the spawn. The clock starts when the car first moves, each checkpoint is
- * captured by proximity, and passing the last one finishes the run. Pure
+ * the spawn. The clock starts after a short staged countdown, each checkpoint
+ * is captured by proximity, and passing the last one finishes the run. Pure
  * sim logic — rendering of gates and timers lives in the render layer.
  */
 
@@ -14,7 +14,7 @@ export interface Checkpoint {
   z: number;
 }
 
-export type RacePhase = 'ready' | 'running' | 'finished';
+export type RacePhase = 'ready' | 'countdown' | 'running' | 'finished';
 
 /** Plain-data view of one entrant's standing (player or AI). */
 export interface Standing {
@@ -35,6 +35,7 @@ export interface RaceState {
   current: number;
   count: number;
   elapsed: number;
+  countdownRemaining: number;
   finishTime: number | null;
   next: Checkpoint | null;
   /** 1-based finishing-order position of the player among all entrants. */
@@ -49,6 +50,7 @@ export class Race {
   current = 0;
   phase: RacePhase = 'ready';
   elapsed = 0;
+  countdownRemaining = 0;
   finishTime: number | null = null;
 
   constructor(terrain: Terrain, seed: number) {
@@ -76,15 +78,29 @@ export class Race {
     this.current = 0;
     this.phase = 'ready';
     this.elapsed = 0;
+    this.countdownRemaining = 0;
     this.finishTime = null;
   }
 
-  step(dt: number, x: number, z: number, speed: number): void {
+  startCountdown(): void {
+    this.current = 0;
+    this.phase = 'countdown';
+    this.elapsed = 0;
+    this.countdownRemaining = RACE.countdownSeconds;
+    this.finishTime = null;
+  }
+
+  step(dt: number, x: number, z: number): void {
     if (this.phase === 'finished') return;
-    if (this.phase === 'ready') {
-      if (speed < RACE.startSpeed) return;
-      this.phase = 'running';
+    if (this.phase === 'ready') return;
+    if (this.phase === 'countdown') {
+      this.countdownRemaining = Math.max(0, this.countdownRemaining - dt);
+      if (this.countdownRemaining <= 0) {
+        this.phase = 'running';
+      }
+      return;
     }
+
     this.elapsed += dt;
 
     const cp = this.checkpoints[this.current];
@@ -102,6 +118,7 @@ export class Race {
     out.current = this.current;
     out.count = this.checkpoints.length;
     out.elapsed = this.elapsed;
+    out.countdownRemaining = this.countdownRemaining;
     out.finishTime = this.finishTime;
     out.next = this.phase === 'finished' ? null : this.checkpoints[this.current];
   }
