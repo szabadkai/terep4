@@ -25,6 +25,7 @@ export function applyObstacleForces(body: RigidBody, terrain: Terrain, _dt: numb
     body.localToWorld(probeLocal.set(0, col.probeY, dz), probe);
 
     forEachItemNear(probe.x, probe.z, SEARCH_RANGE, terrain, WORLD.seed, (item) => {
+      if (item.radius <= 0) return;
       // No hit if the chassis is flying above the obstacle.
       if (probe.y - col.probeRadius > item.y + item.height) return;
 

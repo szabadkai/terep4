@@ -369,7 +369,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** Biome Regions, Add More Scatter Props
 
-### [ ] Add More Scatter Props
+### [x] Add More Scatter Props
 
 **Goal:** Increase environmental variety without changing core terrain.
 

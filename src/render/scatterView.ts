@@ -1,5 +1,5 @@
 /**
- * Renders the deterministic scatter (pines, leafy trees, boulders) as one
+ * Renders the deterministic scatter (trees, rocks, reeds, logs, bushes, etc.) as one
  * InstancedMesh per kind per chunk, streamed with the same lifecycle as the
  * terrain chunks. Templates are merged low-poly primitives with baked
  * vertex colors; per-instance tint breaks up the repetition.
@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CHUNKS, COLORS, WORLD } from '../config';
-import { itemsInRect, type ScatterItem, type ScatterKind } from '../terrain/scatter';
+import { SCATTER_KINDS, itemsInRect, type ScatterItem, type ScatterKind } from '../terrain/scatter';
 import { hash2 } from '../terrain/noise';
 import type { Terrain } from '../terrain/terrain';
 
@@ -28,7 +28,18 @@ export class ScatterView {
     private readonly scene: THREE.Scene,
     private readonly terrain: Terrain,
   ) {
-    this.templates = { pine: pineTemplate(), tree: treeTemplate(), boulder: boulderTemplate() };
+    this.templates = {
+      pine: pineTemplate(),
+      tree: treeTemplate(),
+      boulder: boulderTemplate(),
+      bush: bushTemplate(),
+      smallRock: smallRockTemplate(),
+      log: logTemplate(),
+      reed: reedTemplate(),
+      deadTree: deadTreeTemplate(),
+      grassClump: grassClumpTemplate(),
+      markerPost: markerPostTemplate(),
+    };
   }
 
   update(focusX: number, focusZ: number): void {
@@ -70,7 +81,7 @@ export class ScatterView {
     );
     const group = new THREE.Group();
 
-    for (const kind of ['pine', 'tree', 'boulder'] as ScatterKind[]) {
+    for (const kind of SCATTER_KINDS) {
       const ofKind = items.filter((i) => i.kind === kind);
       if (ofKind.length === 0) continue;
       group.add(this.buildInstances(kind, ofKind));
@@ -141,4 +152,98 @@ function boulderTemplate(): THREE.BufferGeometry {
     new THREE.IcosahedronGeometry(1, 0).scale(1, 0.72, 1.15).translate(0, 0.45, 0),
     COLORS.boulder,
   );
+}
+
+function smallRockTemplate(): THREE.BufferGeometry {
+  return paint(
+    new THREE.DodecahedronGeometry(0.55, 0).scale(1.1, 0.55, 0.85).translate(0, 0.22, 0),
+    COLORS.boulder,
+  );
+}
+
+function bushTemplate(): THREE.BufferGeometry {
+  return mergeGeometries([
+    paint(
+      new THREE.IcosahedronGeometry(0.7, 0).scale(1.25, 0.62, 1).translate(0, 0.42, 0),
+      COLORS.bush,
+    ),
+    paint(
+      new THREE.IcosahedronGeometry(0.45, 0).scale(0.9, 0.55, 1).translate(0.45, 0.62, 0.08),
+      COLORS.leaf,
+    ),
+  ]);
+}
+
+function logTemplate(): THREE.BufferGeometry {
+  const trunk = new THREE.CylinderGeometry(0.22, 0.26, 1.8, 7);
+  trunk.rotateZ(Math.PI / 2);
+  trunk.translate(0, 0.26, 0);
+  const endA = new THREE.CylinderGeometry(0.235, 0.235, 0.035, 7);
+  endA.rotateZ(Math.PI / 2);
+  endA.translate(-0.92, 0.26, 0);
+  const endB = endA.clone().translate(1.84, 0, 0);
+  return mergeGeometries([
+    paint(trunk, COLORS.deadWood),
+    paint(endA, COLORS.trunk),
+    paint(endB, COLORS.trunk),
+  ]);
+}
+
+function reedTemplate(): THREE.BufferGeometry {
+  return mergeGeometries([
+    reedBlade(-0.16, 0.62, -0.18),
+    reedBlade(0.04, 0.82, 0.08),
+    reedBlade(0.18, 0.55, 0.28),
+    paint(
+      new THREE.CylinderGeometry(0.035, 0.035, 0.28, 5).translate(0.04, 0.78, 0.08),
+      COLORS.trunk,
+    ),
+  ]);
+}
+
+function reedBlade(x: number, height: number, rot: number): THREE.BufferGeometry {
+  const blade = new THREE.ConeGeometry(0.055, height, 4);
+  blade.rotateZ(rot);
+  blade.translate(x, height / 2, 0);
+  return paint(blade, COLORS.reed);
+}
+
+function deadTreeTemplate(): THREE.BufferGeometry {
+  const trunk = new THREE.CylinderGeometry(0.11, 0.17, 2.6, 5).translate(0, 1.3, 0);
+  const branchA = new THREE.CylinderGeometry(0.035, 0.055, 0.85, 5);
+  branchA.rotateZ(-0.85);
+  branchA.translate(0.3, 1.75, 0);
+  const branchB = new THREE.CylinderGeometry(0.03, 0.05, 0.7, 5);
+  branchB.rotateZ(0.75);
+  branchB.rotateY(0.8);
+  branchB.translate(-0.24, 1.35, 0.12);
+  return mergeGeometries([
+    paint(trunk, COLORS.deadWood),
+    paint(branchA, COLORS.deadWood),
+    paint(branchB, COLORS.deadWood),
+  ]);
+}
+
+function grassClumpTemplate(): THREE.BufferGeometry {
+  return mergeGeometries([
+    grassBlade(-0.22, 0.55, -0.36),
+    grassBlade(-0.08, 0.68, -0.16),
+    grassBlade(0.08, 0.62, 0.18),
+    grassBlade(0.22, 0.48, 0.38),
+  ]);
+}
+
+function grassBlade(x: number, height: number, rot: number): THREE.BufferGeometry {
+  const blade = new THREE.ConeGeometry(0.04, height, 4);
+  blade.rotateZ(rot);
+  blade.translate(x, height / 2, 0);
+  return paint(blade, COLORS.grassClump);
+}
+
+function markerPostTemplate(): THREE.BufferGeometry {
+  return mergeGeometries([
+    paint(new THREE.CylinderGeometry(0.07, 0.08, 1.25, 5).translate(0, 0.62, 0), COLORS.deadWood),
+    paint(new THREE.BoxGeometry(0.18, 0.42, 0.08).translate(0, 1.18, 0), COLORS.markerPaint),
+    paint(new THREE.BoxGeometry(0.2, 0.06, 0.1).translate(0, 1.05, 0), COLORS.trim),
+  ]);
 }

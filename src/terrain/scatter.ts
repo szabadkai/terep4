@@ -10,7 +10,20 @@ import { SCATTER, WORLD } from '../config';
 import { hash2, fbm } from './noise';
 import type { Terrain } from './terrain';
 
-export type ScatterKind = 'pine' | 'tree' | 'boulder';
+export const SCATTER_KINDS = [
+  'pine',
+  'tree',
+  'boulder',
+  'bush',
+  'smallRock',
+  'log',
+  'reed',
+  'deadTree',
+  'grassClump',
+  'markerPost',
+] as const;
+
+export type ScatterKind = (typeof SCATTER_KINDS)[number];
 
 export interface ScatterItem {
   kind: ScatterKind;
@@ -41,8 +54,11 @@ export function itemInCell(
   if (x * x + z * z < SCATTER.clearRadius * SCATTER.clearRadius) return null;
 
   const h = terrain.height(x, z);
-  if (h < WORLD.waterLevel + WORLD.sandShore) return null;
+  if (h < WORLD.waterLevel + 0.18) return null;
   const biome = terrain.biome(x, z);
+  const surface = terrain.surface(x, z);
+  const shore = h < WORLD.waterLevel + WORLD.sandShore + 1.7;
+  const slopeY = terrain.normal(x, z, tmpNormal).y;
 
   const size = 0.8 + 0.5 * hash2(cx, cz, seed + 505);
   const rotation = hash2(cx, cz, seed + 506) * Math.PI * 2;
@@ -64,6 +80,9 @@ export function itemInCell(
     };
   }
 
+  const prop = smallProp(cx, cz, x, z, h, biome, surface, shore, slopeY, seed);
+  if (prop) return prop;
+
   const forest = fbm(x / SCATTER.forestWavelength, z / SCATTER.forestWavelength, 2, seed + 504);
   const densityMul =
     biome === 'pineForest'
@@ -79,10 +98,11 @@ export function itemInCell(
               : biome === 'riverValley'
                 ? 0.72
                 : 0.9;
-  const density = (SCATTER.treeBase + SCATTER.treeForest * smoothstep(0.05, 0.55, forest)) * densityMul;
+  const density =
+    (SCATTER.treeBase + SCATTER.treeForest * smoothstep(0.05, 0.55, forest)) * densityMul;
   if (roll >= density) return null;
   if (h > SCATTER.treeline) return null;
-  if (terrain.normal(x, z, tmpNormal).y < SCATTER.maxSlope) return null;
+  if (slopeY < SCATTER.maxSlope) return null;
 
   const pineChance =
     biome === 'pineForest'
@@ -107,6 +127,87 @@ export function itemInCell(
     radius: SCATTER.trunkRadius * size,
     height: 4.2 * size,
   };
+}
+
+function smallProp(
+  cx: number,
+  cz: number,
+  x: number,
+  z: number,
+  h: number,
+  biome: string,
+  surface: string,
+  shore: boolean,
+  slopeY: number,
+  seed: number,
+): ScatterItem | null {
+  if (slopeY < 0.62) return null;
+
+  const propRoll = hash2(cx, cz, seed + 520);
+  const chance =
+    biome === 'marsh'
+      ? 0.28
+      : biome === 'rockyHighlands'
+        ? 0.24
+        : biome === 'sandyShore'
+          ? 0.24
+          : biome === 'riverValley'
+            ? 0.22
+            : biome === 'grassland'
+              ? 0.18
+              : biome === 'snowRidge'
+                ? 0.14
+                : 0.12;
+  if (propRoll > chance) return null;
+
+  const pick = hash2(cx, cz, seed + 521);
+  const size = 0.65 + 0.8 * hash2(cx, cz, seed + 522);
+  const rotation = hash2(cx, cz, seed + 523) * Math.PI * 2;
+
+  if ((shore || biome === 'marsh' || biome === 'riverValley') && pick < 0.42) {
+    return propItem('reed', x, z, h, size * 0.85, rotation, 0, 0.9);
+  }
+  if (surface === 'rock' || biome === 'rockyHighlands') {
+    return pick < 0.62
+      ? propItem('smallRock', x, z, h - 0.05 * size, size, rotation, 0, 0.42)
+      : propItem('deadTree', x, z, h, size * 0.9, rotation, SCATTER.trunkRadius * size, 3.0 * size);
+  }
+  if (surface === 'sand' || biome === 'sandyShore') {
+    return pick < 0.48
+      ? propItem('log', x, z, h + 0.08, size, rotation, 0.42 * size, 0.42 * size)
+      : propItem('smallRock', x, z, h - 0.05 * size, size * 0.75, rotation, 0, 0.32);
+  }
+  if (surface === 'snow' || biome === 'snowRidge') {
+    return pick < 0.45
+      ? propItem('smallRock', x, z, h - 0.05 * size, size * 0.85, rotation, 0, 0.36)
+      : propItem(
+          'deadTree',
+          x,
+          z,
+          h,
+          size * 0.82,
+          rotation,
+          SCATTER.trunkRadius * size,
+          2.8 * size,
+        );
+  }
+  if (pick < 0.36) return propItem('grassClump', x, z, h, size, rotation, 0, 0.55);
+  if (pick < 0.66) return propItem('bush', x, z, h, size, rotation, 0, 0.95);
+  if (pick < 0.86) return propItem('markerPost', x, z, h, size, rotation, 0.11 * size, 1.5 * size);
+  return propItem('log', x, z, h + 0.08, size, rotation, 0.42 * size, 0.42 * size);
+}
+
+function propItem(
+  kind: ScatterKind,
+  x: number,
+  z: number,
+  y: number,
+  size: number,
+  rotation: number,
+  radius: number,
+  height: number,
+): ScatterItem {
+  return { kind, x, z, y, size, rotation, radius, height };
 }
 
 /** Visit every item whose cell could place it within `range` of (x, z). */
