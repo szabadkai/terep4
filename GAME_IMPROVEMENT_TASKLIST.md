@@ -510,7 +510,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 
 ## Milestone 6: Audio And Game Feel
 
-### [ ] Add Engine And Surface Audio Hooks
+### [x] Add Engine And Surface Audio Hooks
 
 **Goal:** Make speed and terrain understandable through sound.
 
