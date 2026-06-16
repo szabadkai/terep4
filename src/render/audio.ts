@@ -65,6 +65,7 @@ export class GameAudio {
   private running = false;
   private previousCheckpoint = 0;
   private previousPhase: RaceState['phase'] = 'ready';
+  private previousCountdownStep = 0;
   private accelCooldown = 0;
   private impactCooldown = 0;
   private landingCooldown = 0;
@@ -92,6 +93,18 @@ export class GameAudio {
     this.settings.sfx = clamp01(next.sfx);
     saveAudioSettings(this.settings);
     this.applySettings();
+  }
+
+  playUi(kind: 'confirm' | 'pause' | 'resume' | 'restart'): void {
+    const profile =
+      kind === 'pause'
+        ? { frequency: 260, endFrequency: 180, duration: 0.09, volume: 0.09 }
+        : kind === 'resume'
+          ? { frequency: 320, endFrequency: 520, duration: 0.1, volume: 0.1 }
+          : kind === 'restart'
+            ? { frequency: 220, endFrequency: 440, duration: 0.14, volume: 0.11 }
+            : { frequency: 360, endFrequency: 500, duration: 0.08, volume: 0.08 };
+    this.playTone(profile);
   }
 
   start(): void {
@@ -130,15 +143,11 @@ export class GameAudio {
     this.accelCooldown = Math.max(0, this.accelCooldown - frameDt);
     this.impactCooldown = Math.max(0, this.impactCooldown - frameDt);
     this.landingCooldown = Math.max(0, this.landingCooldown - frameDt);
+    this.updateRaceFeedback(race);
+
     if (race.phase === 'ready') {
       this.previousCheckpoint = race.current;
-      this.previousPhase = race.phase;
-    }
-    if (race.current > this.previousCheckpoint) {
-      this.playCheckpoint();
-    }
-    if (race.phase === 'finished' && this.previousPhase !== 'finished') {
-      this.playCheckpoint();
+      this.previousCountdownStep = 0;
     }
     this.previousCheckpoint = race.current;
     this.previousPhase = race.phase;
@@ -214,10 +223,58 @@ export class GameAudio {
     this.applySettings();
   }
 
-  private playCheckpoint(): void {
-    this.checkpoint.volume = this.sfxVolume() * 0.42;
+  private updateRaceFeedback(race: RaceState): void {
+    if (race.phase === 'countdown') {
+      const step = Math.max(1, Math.ceil(race.countdownRemaining));
+      if (step !== this.previousCountdownStep) {
+        this.previousCountdownStep = step;
+        this.playCountdownBeep(step);
+      }
+    } else if (this.previousPhase === 'countdown' && race.phase === 'running') {
+      this.previousCountdownStep = 0;
+      this.playCountdownGo();
+    } else if (race.phase === 'ready') {
+      this.previousCountdownStep = 0;
+    }
+
+    if (race.current > this.previousCheckpoint) {
+      const finalCheckpoint = race.phase === 'finished';
+      this.playCheckpoint(finalCheckpoint);
+      if (finalCheckpoint) this.playFinish();
+    } else if (race.phase === 'finished' && this.previousPhase !== 'finished') {
+      this.playFinish();
+    }
+  }
+
+  private playCheckpoint(finalCheckpoint = false): void {
+    this.checkpoint.playbackRate = finalCheckpoint ? 1.12 : 1;
+    this.checkpoint.volume = this.sfxVolume() * (finalCheckpoint ? 0.58 : 0.38);
     this.checkpoint.currentTime = 0;
     void play(this.checkpoint);
+    if (finalCheckpoint) {
+      this.playTone({ frequency: 660, endFrequency: 990, duration: 0.18, volume: 0.08 });
+    }
+  }
+
+  private playCountdownBeep(step: number): void {
+    this.playTone({
+      frequency: step === 1 ? 560 : 420,
+      endFrequency: step === 1 ? 560 : 420,
+      duration: 0.1,
+      volume: 0.1,
+      type: 'square',
+    });
+  }
+
+  private playCountdownGo(): void {
+    this.playTone({ frequency: 620, endFrequency: 980, duration: 0.2, volume: 0.13 });
+  }
+
+  private playFinish(): void {
+    this.playTone({ frequency: 520, endFrequency: 780, duration: 0.16, volume: 0.12 });
+    window.setTimeout(() => {
+      this.playTone({ frequency: 780, endFrequency: 1040, duration: 0.22, volume: 0.1 });
+    }, 120);
   }
 
   private applySettings(): void {
@@ -317,6 +374,37 @@ export class GameAudio {
     noise.start(now);
     osc.stop(now + duration);
     noise.stop(now + duration);
+  }
+
+  private playTone({
+    frequency,
+    endFrequency,
+    duration,
+    volume,
+    type = 'sine',
+  }: {
+    frequency: number;
+    endFrequency: number;
+    duration: number;
+    volume: number;
+    type?: OscillatorType;
+  }): void {
+    const ctx = this.ensureAudioContext();
+    const sfx = this.sfxVolume();
+    if (!ctx || sfx <= 0) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, now);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), now + duration);
+    gain.gain.setValueAtTime(sfx * volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + duration);
   }
 
   private ensureAudioContext(): AudioContext | null {

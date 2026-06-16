@@ -70,11 +70,13 @@ const loop = new FixedLoop(
         ui.hideStart();
         world.startCountdown();
         audio.start();
+        audio.playUi('confirm');
         needsRender = true;
       } else if (paused) {
         paused = false;
         ui.setPaused(false);
         audio.start();
+        audio.playUi('resume');
         needsRender = true;
       } else if (world.raceState.phase === 'finished') {
         world.restartRace();
@@ -83,14 +85,20 @@ const loop = new FixedLoop(
         ui.hideFinish();
         hud.setBest(ui.best);
         audio.start();
+        audio.playUi('restart');
         needsRender = true;
       }
     }
     if (input.takePause() && started) {
       paused = !paused;
       ui.setPaused(paused);
-      if (paused) audio.pause();
-      else audio.start();
+      if (paused) {
+        audio.playUi('pause');
+        audio.pause();
+      } else {
+        audio.start();
+        audio.playUi('resume');
+      }
       needsRender = true;
     }
     if (input.takeDebugToggle()) {

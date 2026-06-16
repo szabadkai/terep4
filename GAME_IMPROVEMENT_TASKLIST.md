@@ -556,7 +556,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** Medium  
 **Depends On:** Settings Persistence
 
-### [ ] Add Race Feedback Sounds
+### [x] Add Race Feedback Sounds
 
 **Goal:** Make checkpoint and race-state events feel responsive.
 
