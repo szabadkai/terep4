@@ -11,6 +11,13 @@ export const SIM = {
   killHeight: -80,
 };
 
+export const RENDER = {
+  /** Rendering above this does not add useful motion clarity for this game. */
+  maxFps: 60,
+  /** High-DPI displays get expensive quickly; keep the low-poly style crisp enough. */
+  maxPixelRatio: 1.5,
+};
+
 // ---------------------------------------------------------------------------
 // Surfaces
 // ---------------------------------------------------------------------------
@@ -320,14 +327,14 @@ export const OPPONENTS: OpponentSpec[] = [
     startOffset: -3.2,
     skill: 0.97,
     profile: {
-      aggression: 1.14,
-      terrainCaution: 0.86,
-      recoveryPatience: 0.9,
-      brakeBias: 0.9,
-      preferredSpeed: 1.1,
+      aggression: 1.08,
+      terrainCaution: 0.96,
+      recoveryPatience: 1.08,
+      brakeBias: 0.98,
+      preferredSpeed: 1.06,
     },
-    power: 1.07,
-    topSpeed: 1.05,
+    power: 1.05,
+    topSpeed: 1.03,
   },
   {
     name: 'Borz',
@@ -397,11 +404,11 @@ export const AI = {
   /** Terrain speed multipliers by surface under grounded wheels. */
   surfaceSpeed: {
     grass: 1,
-    rock: 0.82,
-    mud: 0.48,
-    sand: 0.6,
-    snow: 0.52,
-    water: 0.36,
+    rock: 0.9,
+    mud: 0.64,
+    sand: 0.72,
+    snow: 0.66,
+    water: 0.58,
   },
   /** Floor after personality terrain-caution scaling. */
   minSurfaceSpeedMultiplier: 0.24,
@@ -428,13 +435,13 @@ export const AI = {
   /** ...down to at most this throttle fraction, so the turn radius tucks in. */
   approachThrottle: 0.4,
   /** Considered stuck if horizontal speed stays under this (m/s)... */
-  stuckSpeed: 1.2,
+  stuckSpeed: 0.7,
   /** ...for this long (s); then reverse to unstick. */
-  stuckTime: 2.4,
+  stuckTime: 5.5,
   /** Also reverse when distance to the checkpoint fails to improve this long. */
-  poorProgressTime: 3.4,
+  poorProgressTime: 8,
   /** Minimum checkpoint-distance improvement per second before AI worries. */
-  minProgressRate: 0.25,
+  minProgressRate: 0.08,
   /** Duration of the reverse-unstick maneuver (s). */
   unstickTime: 1.1,
   /** Brief stop before backing out of a stuck state (s). */
@@ -447,6 +454,8 @@ export const AI = {
   recoveryCrawlThrottle: 0.38,
   /** Reset in place after this many failed recovery attempts at one checkpoint. */
   recoveryMaxAttemptsPerCheckpoint: 3,
+  /** AI reset candidates cannot improve checkpoint distance by more than this many meters. */
+  recoveryResetProgressTolerance: 10,
   /** Local-up dot below this means the AI is nearly upside down. */
   recoveryRolloverUp: 0.28,
   /** Time nearly upside down before the AI gives up and resets (s). */

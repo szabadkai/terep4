@@ -5,7 +5,7 @@
  */
 
 import * as THREE from 'three';
-import { SIM, WORLD } from './config';
+import { RENDER, SIM, WORLD } from './config';
 import { FixedLoop } from './core/loop';
 import { KeyboardInput } from './input/input';
 import { Terrain, NoiseHeightSource } from './terrain/terrain';
@@ -56,44 +56,60 @@ const forward = new THREE.Vector3();
 const loop = new FixedLoop(
   SIM.dt,
   (dt) => {
+    let needsRender = false;
     if (input.takeAction()) {
       if (!started) {
         started = true;
         ui.hideStart();
+        needsRender = true;
       } else if (paused) {
         paused = false;
         ui.setPaused(false);
+        needsRender = true;
       } else if (world.raceState.phase === 'finished') {
         world.restartRace();
         finishShown = false;
         ui.hideFinish();
         hud.setBest(ui.best);
+        needsRender = true;
       }
     }
     if (input.takePause() && started) {
       paused = !paused;
       ui.setPaused(paused);
+      needsRender = true;
     }
-    if (input.takeDebugToggle()) debugOverlay.toggle();
-    if (input.takeReset()) world.resetRequested = true;
+    if (input.takeDebugToggle()) {
+      debugOverlay.toggle();
+      needsRender = true;
+    }
+    if (input.takeReset()) {
+      world.resetRequested = true;
+      needsRender = true;
+    }
 
     if (started && !paused) {
       world.step(input.state, dt);
       clock += dt;
+      needsRender = true;
     }
+    return needsRender;
   },
   (alpha, frameDt) => {
     vehicleView.update(world.prev, world.curr, alpha);
     for (let i = 0; i < opponentViews.length; i++) {
       opponentViews[i].update(world.racerViews[i].prev, world.racerViews[i].curr, alpha);
     }
-    wheelParticles.update(frameDt);
-    tireTracks.update(frameDt);
-    wheelParticles.emitVehicle(0, vehicleView, world.curr, frameDt);
-    tireTracks.emitVehicle(0, vehicleView, world.curr);
-    for (let i = 0; i < opponentViews.length; i++) {
-      wheelParticles.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr, frameDt);
-      tireTracks.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr);
+    const effectsActive = started && !paused;
+    if (effectsActive) {
+      wheelParticles.update(frameDt);
+      tireTracks.update(frameDt);
+      wheelParticles.emitVehicle(0, vehicleView, world.curr, frameDt);
+      tireTracks.emitVehicle(0, vehicleView, world.curr);
+      for (let i = 0; i < opponentViews.length; i++) {
+        wheelParticles.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr, frameDt);
+        tireTracks.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr);
+      }
     }
     terrainView.update(vehicleView.group.position.x, vehicleView.group.position.z);
     scatterView.update(vehicleView.group.position.x, vehicleView.group.position.z);
@@ -116,9 +132,11 @@ const loop = new FixedLoop(
 
     renderer.render(scene, camera);
   },
+  { maxRenderFps: RENDER.maxFps },
 );
 
 loop.start();
+window.addEventListener('resize', () => loop.requestRender());
 
 if (import.meta.env.DEV) {
   // Dev console handle for poking the sim (not part of any layer contract).

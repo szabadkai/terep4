@@ -6,10 +6,11 @@
 
 import { formatTime } from './hud';
 
-const BEST_KEY = 'terep4.best';
+const BEST_KEY = 'mud.best';
+const LEGACY_BEST_KEY = 'terep4.best';
 
 export function loadBest(): number | null {
-  const raw = localStorage.getItem(BEST_KEY);
+  const raw = localStorage.getItem(BEST_KEY) ?? localStorage.getItem(LEGACY_BEST_KEY);
   const v = raw === null ? NaN : Number(raw);
   return Number.isFinite(v) ? v : null;
 }
@@ -28,8 +29,8 @@ export class GameUi {
     this.startEl = overlay(
       container,
       `
-      <h1>TEREP4</h1>
-      <p class="ui-tag">off-road checkpoint race</p>
+      <h1>MUD</h1>
+      <p class="ui-tag">No roads. Low gear. Full send.</p>
       <div class="ui-controls">
         <span>W / S</span><span>throttle · brake / reverse</span>
         <span>A / D</span><span>steer</span>

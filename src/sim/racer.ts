@@ -223,7 +223,7 @@ export class Racer {
       ? this.driver.drive(this.vehicle, aim.x, aim.z, cpDist, this.current, dt)
       : this.driver.input;
     if (this.driver.takeResetRequest()) {
-      const resetPoint = this.recoveryResetPoint(cp);
+      const resetPoint = this.recoveryResetPoint(cp, cpDist);
       this.vehicle.reset(resetPoint.x, resetPoint.z, this.vehicle.yaw());
       this.driver.acknowledgeVehicleReset(Math.hypot(resetPoint.x - cp.x, resetPoint.z - cp.z));
       this.routeOffset = 0;
@@ -240,23 +240,19 @@ export class Racer {
     }
   }
 
-  private recoveryResetPoint(cp: Checkpoint): Checkpoint {
+  private recoveryResetPoint(cp: Checkpoint, baseDist: number): Checkpoint {
     const pos = this.vehicle.body.pos;
-    const dx = cp.x - pos.x;
-    const dz = cp.z - pos.z;
-    const dist = Math.hypot(dx, dz) || 1;
-    const ux = dx / dist;
-    const uz = dz / dist;
-    const px = -uz;
-    const pz = ux;
-    const baseDist = dist;
-
     let best = { x: pos.x, z: pos.z };
     let bestScore = this.resetPointScore(best.x, best.z, pos.x, pos.z, cp, baseDist);
-    for (const forward of [12, 24, 38, 54]) {
-      for (const lateral of [-22, -11, 0, 11, 22]) {
-        const x = pos.x + ux * forward + px * lateral;
-        const z = pos.z + uz * forward + pz * lateral;
+    const bearings = [0, -0.55, 0.55, -1.1, 1.1, -1.7, 1.7, Math.PI];
+    const targetBearing = Math.atan2(cp.x - pos.x, cp.z - pos.z);
+    for (const distance of [10, 18, 30, 44]) {
+      for (const delta of bearings) {
+        const bearing = targetBearing + delta;
+        const x = pos.x + Math.sin(bearing) * distance;
+        const z = pos.z + Math.cos(bearing) * distance;
+        const cpDist = Math.hypot(cp.x - x, cp.z - z);
+        if (cpDist < baseDist - AI.recoveryResetProgressTolerance) continue;
         const score = this.resetPointScore(x, z, pos.x, pos.z, cp, baseDist);
         if (score < bestScore) {
           bestScore = score;
@@ -279,13 +275,12 @@ export class Racer {
     const height = this.terrain.height(x, z);
     const cpDist = Math.hypot(cp.x - x, cp.z - z);
     const moveDist = Math.hypot(x - fromX, z - fromZ);
-    const progress = baseDist - cpDist;
+    const progress = Math.max(0, baseDist - cpDist);
     return (
       SURFACE_RESET_PENALTY[surface] +
       Math.max(0, 0.8 - height) * 40 +
-      Math.max(0, -progress) * 0.12 -
-      progress * 0.18 +
-      moveDist * 0.06
+      progress * 10 +
+      moveDist * 0.08
     );
   }
 }

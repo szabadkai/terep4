@@ -6,22 +6,32 @@
  *
  * Driven by requestAnimationFrame while visible; falls back to a coarse
  * interval when the tab is hidden so the simulation (and race clock) keep
- * running instead of freezing.
+ * running instead of freezing. Rendering is demand-based: fixed updates
+ * report whether anything changed, so static menu/pause screens do not burn
+ * frames.
  */
 
 const HIDDEN_TICK_MS = 100;
 
+export interface FixedLoopOptions {
+  maxRenderFps?: number;
+}
+
 export class FixedLoop {
   private accumulator = 0;
+  private renderAccumulator = 0;
   private last = 0;
+  private lastRender = 0;
   private rafId = 0;
   private intervalId: ReturnType<typeof setInterval> | undefined;
   private running = false;
+  private needsRender = true;
 
   constructor(
     private readonly dt: number,
-    private readonly update: (dt: number) => void,
+    private readonly update: (dt: number) => boolean | void,
     private readonly render: (alpha: number, frameDt: number) => void,
+    private readonly options: FixedLoopOptions = {},
   ) {}
 
   start(): void {
@@ -30,6 +40,10 @@ export class FixedLoop {
     this.last = performance.now();
     document.addEventListener('visibilitychange', this.onVisibility);
     this.schedule();
+  }
+
+  requestRender(): void {
+    this.needsRender = true;
   }
 
   stop(): void {
@@ -70,11 +84,20 @@ export class FixedLoop {
     if (frameDt > 0.25) frameDt = 0.25;
 
     this.accumulator += frameDt;
+    this.renderAccumulator += frameDt;
     while (this.accumulator >= this.dt) {
-      this.update(this.dt);
+      if (this.update(this.dt) !== false) this.needsRender = true;
       this.accumulator -= this.dt;
     }
 
-    this.render(this.accumulator / this.dt, frameDt);
+    if (document.hidden || !this.needsRender) return;
+    const minRenderInterval = this.options.maxRenderFps ? 1000 / this.options.maxRenderFps : 0;
+    if (minRenderInterval > 0 && now - this.lastRender < minRenderInterval) return;
+
+    this.lastRender = now;
+    this.needsRender = false;
+    const renderDt = this.renderAccumulator;
+    this.renderAccumulator = 0;
+    this.render(this.accumulator / this.dt, renderDt);
   }
 }

@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { CAMERA, COLORS } from '../config';
+import { CAMERA, COLORS, RENDER } from '../config';
 
 export interface SceneContext {
   renderer: THREE.WebGLRenderer;
@@ -15,7 +15,7 @@ export interface SceneContext {
 
 export function createScene(container: HTMLElement): SceneContext {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDER.maxPixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight);
   container.appendChild(renderer.domElement);
 
