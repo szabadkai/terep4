@@ -21,6 +21,7 @@ import { GameUi } from './render/ui';
 import { DebugOverlay } from './render/debugOverlay';
 import { WheelParticles } from './render/wheelParticles';
 import { TireTracks } from './render/tireTracks';
+import { GameAudio } from './render/audio';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container');
@@ -42,7 +43,13 @@ const checkpointView = new CheckpointView(scene, terrain, world.race.checkpoints
 const wheelParticles = new WheelParticles(scene, terrain);
 const tireTracks = new TireTracks(scene, terrain);
 const cameraRig = new CameraRig(camera, terrain);
-const ui = new GameUi(container, () => input.pushAction());
+const audio = new GameAudio();
+const ui = new GameUi(
+  container,
+  () => input.pushAction(),
+  audio.settings,
+  (settings) => audio.setSettings(settings),
+);
 const hud = new Hud(container, ui.best);
 const debugOverlay = new DebugOverlay(container);
 
@@ -61,22 +68,27 @@ const loop = new FixedLoop(
       if (!started) {
         started = true;
         ui.hideStart();
+        audio.start();
         needsRender = true;
       } else if (paused) {
         paused = false;
         ui.setPaused(false);
+        audio.start();
         needsRender = true;
       } else if (world.raceState.phase === 'finished') {
         world.restartRace();
         finishShown = false;
         ui.hideFinish();
         hud.setBest(ui.best);
+        audio.start();
         needsRender = true;
       }
     }
     if (input.takePause() && started) {
       paused = !paused;
       ui.setPaused(paused);
+      if (paused) audio.pause();
+      else audio.start();
       needsRender = true;
     }
     if (input.takeDebugToggle()) {
@@ -128,7 +140,10 @@ const loop = new FixedLoop(
         world.raceState.position,
         world.raceState.total,
       );
+      audio.pause();
     }
+
+    audio.update(world.curr, world.raceState, frameDt);
 
     renderer.render(scene, camera);
   },
@@ -147,5 +162,6 @@ if (import.meta.env.DEV) {
     forEachItemNear,
     wheelParticles,
     tireTracks,
+    audio,
   };
 }

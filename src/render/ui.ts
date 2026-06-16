@@ -5,6 +5,7 @@
  */
 
 import { formatTime } from './hud';
+import type { AudioSettings } from './audio';
 
 const BEST_KEY = 'mud.best';
 const LEGACY_BEST_KEY = 'terep4.best';
@@ -25,7 +26,12 @@ export class GameUi {
   private readonly finishEl: HTMLElement;
   best: number | null = loadBest();
 
-  constructor(container: HTMLElement, onConfirm: () => void) {
+  constructor(
+    container: HTMLElement,
+    onConfirm: () => void,
+    audioSettings: AudioSettings,
+    onAudioSettings: (settings: AudioSettings) => void,
+  ) {
     this.startEl = overlay(
       container,
       `
@@ -50,6 +56,7 @@ export class GameUi {
     `,
     );
     this.finishEl = overlay(container, '');
+    audioSettingsPanel(container, audioSettings, onAudioSettings);
     this.startEl.classList.add('visible');
 
     for (const el of [this.startEl, this.pauseEl, this.finishEl]) {
@@ -90,6 +97,54 @@ export class GameUi {
   hideFinish(): void {
     this.finishEl.classList.remove('visible');
   }
+}
+
+function audioSettingsPanel(
+  container: HTMLElement,
+  initial: AudioSettings,
+  onChange: (settings: AudioSettings) => void,
+): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'audio-settings';
+  el.innerHTML = `
+    <button class="audio-settings-toggle" type="button" aria-label="Audio settings">AUDIO</button>
+    <div class="audio-settings-menu">
+      ${slider('master', 'Master', initial.master)}
+      ${slider('music', 'Music', initial.music)}
+      ${slider('sfx', 'SFX', initial.sfx)}
+    </div>
+  `;
+  const toggle = el.querySelector<HTMLButtonElement>('.audio-settings-toggle')!;
+  const menu = el.querySelector<HTMLElement>('.audio-settings-menu')!;
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    menu.classList.toggle('visible');
+  });
+  menu.addEventListener('click', (event) => event.stopPropagation());
+  const read = (): AudioSettings => ({
+    master: readSlider(el, 'master'),
+    music: readSlider(el, 'music'),
+    sfx: readSlider(el, 'sfx'),
+  });
+  for (const input of el.querySelectorAll<HTMLInputElement>('input[type="range"]')) {
+    input.addEventListener('input', () => onChange(read()));
+    input.addEventListener('change', () => onChange(read()));
+  }
+  container.appendChild(el);
+  return el;
+}
+
+function slider(id: keyof AudioSettings, label: string, value: number): string {
+  return `
+    <label>
+      <span>${label}</span>
+      <input type="range" min="0" max="1" step="0.01" value="${value}" data-audio="${id}" />
+    </label>
+  `;
+}
+
+function readSlider(container: HTMLElement, id: keyof AudioSettings): number {
+  return Number(container.querySelector<HTMLInputElement>(`[data-audio="${id}"]`)?.value ?? 0);
 }
 
 function overlay(container: HTMLElement, html: string): HTMLElement {
