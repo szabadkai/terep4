@@ -258,7 +258,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** None
 
-### [ ] Improve Water And Shorelines
+### [x] Improve Water And Shorelines
 
 **Goal:** Make water areas feel intentional rather than flat hazards.
 

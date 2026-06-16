@@ -123,7 +123,7 @@ const loop = new FixedLoop(
         tireTracks.emitVehicle(i + 1, opponentViews[i], world.racerViews[i].curr);
       }
     }
-    terrainView.update(vehicleView.group.position.x, vehicleView.group.position.z);
+    terrainView.update(vehicleView.group.position.x, vehicleView.group.position.z, clock);
     scatterView.update(vehicleView.group.position.x, vehicleView.group.position.z);
     checkpointView.update(world.raceState, clock);
     cameraRig.update(vehicleView.group.position, vehicleView.group.quaternion, frameDt);
