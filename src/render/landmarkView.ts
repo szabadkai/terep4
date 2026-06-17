@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { COLORS, RACE, WORLD } from '../config';
+import { COLORS, RACE, WORLD, type BiomeId } from '../config';
 import type { Checkpoint } from '../sim/race';
+import type { LocationZone } from '../terrain/locationZones';
 import { hash2 } from '../terrain/noise';
 import type { Terrain } from '../terrain/terrain';
 
@@ -13,17 +14,52 @@ type LandmarkType =
   | 'stoneArch'
   | 'floodlightRig';
 
-const LANDMARK_TYPES: readonly LandmarkType[] = [
-  'watchtower',
-  'cabin',
-  'radioMast',
-  'wreckedCar',
-  'bannerPoles',
-  'stoneArch',
-  'floodlightRig',
-] as const;
+const STYLE_LANDMARKS: Record<LocationZone['landmarkStyle'], readonly LandmarkType[]> = {
+  ridge: ['radioMast', 'stoneArch', 'floodlightRig'],
+  woods: ['watchtower', 'cabin', 'bannerPoles'],
+  wetland: ['wreckedCar', 'floodlightRig', 'bannerPoles'],
+  flats: ['stoneArch', 'bannerPoles', 'floodlightRig'],
+  pass: ['bannerPoles', 'radioMast', 'stoneArch'],
+  shore: ['cabin', 'wreckedCar', 'bannerPoles'],
+};
+
+const MAJOR_STYLE_LANDMARKS: Record<LocationZone['landmarkStyle'], LandmarkType> = {
+  ridge: 'radioMast',
+  woods: 'watchtower',
+  wetland: 'wreckedCar',
+  flats: 'stoneArch',
+  pass: 'bannerPoles',
+  shore: 'cabin',
+};
+
+const BIOME_LANDMARKS: Record<BiomeId, readonly LandmarkType[]> = {
+  grassland: ['stoneArch', 'bannerPoles', 'floodlightRig'],
+  pineForest: ['watchtower', 'cabin', 'bannerPoles'],
+  marsh: ['wreckedCar', 'floodlightRig', 'bannerPoles'],
+  rockyHighlands: ['radioMast', 'stoneArch', 'floodlightRig'],
+  snowRidge: ['bannerPoles', 'radioMast', 'stoneArch'],
+  sandyShore: ['cabin', 'wreckedCar', 'bannerPoles'],
+  riverValley: ['wreckedCar', 'cabin', 'floodlightRig'],
+};
+
+const LANDMARK_COLLISION_RADIUS: Record<LandmarkType, number> = {
+  watchtower: 1.8,
+  cabin: 2.0,
+  radioMast: 1.35,
+  wreckedCar: 1.8,
+  bannerPoles: 1.8,
+  stoneArch: 2.0,
+  floodlightRig: 1.5,
+};
 
 const GROUND_LIFT = 0.05;
+const TWO_PI = Math.PI * 2;
+
+interface LandmarkPlacement {
+  x: number;
+  z: number;
+  rotation: number;
+}
 
 export class LandmarkView {
   private readonly group = new THREE.Group();
@@ -45,35 +81,36 @@ export class LandmarkView {
     private readonly terrain: Terrain,
     checkpoints: readonly Checkpoint[],
   ) {
+    for (const zone of terrain.locationZones) {
+      const type = MAJOR_STYLE_LANDMARKS[zone.landmarkStyle];
+      const placement = this.zoneLandmarkPlacement(zone, checkpoints);
+      this.addLandmark(type, placement, 1000 + zone.id, 1.2, {
+        scope: 'zone',
+        zone: zone.name,
+        biome: zone.biome,
+        landmarkStyle: zone.landmarkStyle,
+      });
+    }
+
     for (let i = 0; i < checkpoints.length; i++) {
       const cp = checkpoints[i];
       const placement = this.landmarkPlacement(checkpoints, i);
-      const type = LANDMARK_TYPES[Math.floor(hash2(i, 41, WORLD.seed) * LANDMARK_TYPES.length)];
-      const landmark = this.build(type, i);
-      landmark.position.set(
-        placement.x,
-        terrain.height(placement.x, placement.z) + GROUND_LIFT,
-        placement.z,
-      );
-      landmark.rotation.y = placement.rotation;
-      landmark.userData = {
+      const zone =
+        terrain.locationZone(cp.x, cp.z) ?? terrain.locationZone(placement.x, placement.z);
+      const biome = zone?.biome ?? terrain.biome(placement.x, placement.z);
+      const type = this.minorTypeForCheckpoint(i, zone, biome);
+      this.addLandmark(type, placement, i, 1, {
+        scope: 'checkpoint',
         checkpoint: i,
-        type,
+        zone: zone?.name ?? null,
+        biome,
         checkpointDistance: Math.hypot(placement.x - cp.x, placement.z - cp.z),
-      };
-      this.group.add(landmark);
+      });
     }
     scene.add(this.group);
   }
 
-  private landmarkPlacement(
-    checkpoints: readonly Checkpoint[],
-    index: number,
-  ): {
-    x: number;
-    z: number;
-    rotation: number;
-  } {
+  private landmarkPlacement(checkpoints: readonly Checkpoint[], index: number): LandmarkPlacement {
     const cp = checkpoints[index];
     const prev = checkpoints[(index - 1 + checkpoints.length) % checkpoints.length];
     const next = checkpoints[(index + 1) % checkpoints.length];
@@ -91,9 +128,14 @@ export class LandmarkView {
     let z = cp.z + nz * side * offset + tangentZ * slide;
 
     for (let tries = 0; tries < 8; tries++) {
-      const h = this.terrain.height(x, z);
       const dist = Math.hypot(x - cp.x, z - cp.z);
-      if (h > WORLD.waterLevel + 0.7 && dist > RACE.captureRadius * 1.45) break;
+      if (
+        this.isReadableGround(x, z) &&
+        dist > RACE.captureRadius * 1.45 &&
+        this.isClearOfCheckpoints(x, z, checkpoints, RACE.captureRadius * 1.25)
+      ) {
+        break;
+      }
       const angle = Math.atan2(nx * side, nz * side) + (tries - 3) * 0.32;
       const retryOffset = offset + tries * 3;
       x = cp.x + Math.sin(angle) * retryOffset;
@@ -103,9 +145,125 @@ export class LandmarkView {
     return { x, z, rotation: Math.atan2(cp.x - x, cp.z - z) };
   }
 
-  private build(type: LandmarkType, index: number): THREE.Group {
+  private zoneLandmarkPlacement(
+    zone: LocationZone,
+    checkpoints: readonly Checkpoint[],
+  ): LandmarkPlacement {
+    const maxRadius = Math.min(zone.radius * 0.36, 56);
+    let best: LandmarkPlacement = {
+      x: zone.center.x,
+      z: zone.center.z,
+      rotation: Math.atan2(-zone.center.x, -zone.center.z),
+    };
+    let bestScore = this.landmarkPlacementScore(
+      best.x,
+      best.z,
+      checkpoints,
+      RACE.captureRadius * 2.2,
+    );
+
+    for (let tries = 0; tries < 16; tries++) {
+      const angle = hash2(zone.id, 70 + tries, WORLD.seed) * TWO_PI + tries * 0.31;
+      const distance = maxRadius * (0.18 + hash2(zone.id, 90 + tries, WORLD.seed) * 0.82);
+      const x = zone.center.x + Math.sin(angle) * distance;
+      const z = zone.center.z + Math.cos(angle) * distance;
+      const insideZone = Math.hypot(x - zone.center.x, z - zone.center.z) < zone.radius * 0.62;
+      const score =
+        this.landmarkPlacementScore(x, z, checkpoints, RACE.captureRadius * 2.2) +
+        (insideZone ? 0 : 50) +
+        distance / maxRadius;
+      const candidate = { x, z, rotation: Math.atan2(zone.center.x - x, zone.center.z - z) };
+
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+      if (
+        insideZone &&
+        this.isReadableGround(x, z) &&
+        this.isClearOfCheckpoints(x, z, checkpoints, RACE.captureRadius * 2.2)
+      ) {
+        return candidate;
+      }
+    }
+
+    return best;
+  }
+
+  private addLandmark(
+    type: LandmarkType,
+    placement: LandmarkPlacement,
+    index: number,
+    scaleBoost: number,
+    userData: Record<string, unknown>,
+  ): void {
+    const landmark = this.build(type, index, scaleBoost);
+    landmark.position.set(
+      placement.x,
+      this.terrain.height(placement.x, placement.z) + GROUND_LIFT,
+      placement.z,
+    );
+    landmark.rotation.y = placement.rotation;
+    landmark.userData = {
+      ...userData,
+      type,
+      collisionRadius: LANDMARK_COLLISION_RADIUS[type] * scaleBoost,
+    };
+    this.group.add(landmark);
+  }
+
+  private minorTypeForCheckpoint(
+    index: number,
+    zone: LocationZone | null,
+    biome: BiomeId,
+  ): LandmarkType {
+    const choices = zone ? STYLE_LANDMARKS[zone.landmarkStyle] : BIOME_LANDMARKS[biome];
+    return choices[
+      Math.min(choices.length - 1, Math.floor(hash2(index, 41, WORLD.seed) * choices.length))
+    ];
+  }
+
+  private isClearOfCheckpoints(
+    x: number,
+    z: number,
+    checkpoints: readonly Checkpoint[],
+    minDistance: number,
+  ): boolean {
+    return checkpoints.every((cp) => Math.hypot(x - cp.x, z - cp.z) >= minDistance);
+  }
+
+  private isReadableGround(x: number, z: number): boolean {
+    const h = this.terrain.height(x, z);
+    if (h <= WORLD.waterLevel + 0.7) return false;
+    const e = 2.4;
+    const maxDelta = Math.max(
+      Math.abs(h - this.terrain.height(x + e, z)),
+      Math.abs(h - this.terrain.height(x - e, z)),
+      Math.abs(h - this.terrain.height(x, z + e)),
+      Math.abs(h - this.terrain.height(x, z - e)),
+    );
+    return maxDelta < 3.4;
+  }
+
+  private landmarkPlacementScore(
+    x: number,
+    z: number,
+    checkpoints: readonly Checkpoint[],
+    minDistance: number,
+  ): number {
+    const groundScore = this.isReadableGround(x, z) ? 0 : 80;
+    const nearestCheckpoint = checkpoints.reduce(
+      (nearest, cp) => Math.min(nearest, Math.hypot(x - cp.x, z - cp.z)),
+      Number.POSITIVE_INFINITY,
+    );
+    const checkpointScore =
+      nearestCheckpoint >= minDistance ? 0 : ((minDistance - nearestCheckpoint) / minDistance) * 80;
+    return groundScore + checkpointScore;
+  }
+
+  private build(type: LandmarkType, index: number, scaleBoost: number): THREE.Group {
     const group = new THREE.Group();
-    const scale = 0.9 + hash2(index, 45, WORLD.seed) * 0.28;
+    const scale = (0.9 + hash2(index, 45, WORLD.seed) * 0.28) * scaleBoost;
     group.scale.setScalar(scale);
     switch (type) {
       case 'watchtower':

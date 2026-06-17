@@ -409,7 +409,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** Medium  
 **Depends On:** More Scatter Props
 
-### [ ] Add Location-Specific Landmarks
+### [x] Add Location-Specific Landmarks
 
 **Goal:** Tie landmarks to geographic zones instead of placing generic decorations.
 
