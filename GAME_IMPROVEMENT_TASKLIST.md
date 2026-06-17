@@ -304,7 +304,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** None
 
-### [ ] Add Geographic Location Zones
+### [x] Add Geographic Location Zones
 
 **Goal:** Give the map memorable places, not only material changes.
 

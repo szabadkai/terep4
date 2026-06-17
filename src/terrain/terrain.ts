@@ -12,6 +12,7 @@
 import { Vec3, smoothstep, lerp } from '../core/math';
 import { WORLD, type BiomeId, type SurfaceId } from '../config';
 import { fbm, ridgedFbm } from './noise';
+import { createLocationZones, locationZoneAt, type LocationZone } from './locationZones';
 
 export interface HeightSource {
   height(x: number, z: number): number;
@@ -70,10 +71,14 @@ const RAY_STEP = 0.3;
 const BISECT_ITERS = 8;
 
 export class Terrain {
+  readonly locationZones: readonly LocationZone[];
+
   constructor(
     private readonly source: HeightSource,
     private readonly seed: number = WORLD.seed,
-  ) {}
+  ) {
+    this.locationZones = createLocationZones(seed);
+  }
 
   height(x: number, z: number): number {
     return this.source.height(x, z);
@@ -91,6 +96,11 @@ export class Terrain {
     const r = Math.hypot(x, z);
     const g = WORLD.gen;
     if (r < g.spawnFlatOuter * 1.15) return 'grassland';
+
+    const zone = this.locationZone(x, z);
+    if (zone && Math.hypot(x - zone.center.x, z - zone.center.z) < zone.radius * 0.58) {
+      return zone.biome;
+    }
 
     const e = NORMAL_EPS;
     const dx = this.height(x - e, z) - this.height(x + e, z);
@@ -110,6 +120,10 @@ export class Terrain {
     if (ny < WORLD.rockSlope + 0.04 || (h > 15 && ridge > 0.54)) return 'rockyHighlands';
     if (forest > -0.03 && h < 22 && ny > FOREST_MIN_NORMAL_Y) return 'pineForest';
     return 'grassland';
+  }
+
+  locationZone(x: number, z: number): LocationZone | null {
+    return locationZoneAt(x, z, this.locationZones);
   }
 
   surface(x: number, z: number): SurfaceId {

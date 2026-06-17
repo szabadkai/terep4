@@ -27,6 +27,9 @@ export class GameUi {
   private readonly countdownEl: HTMLElement;
   private readonly pauseEl: HTMLElement;
   private readonly finishEl: HTMLElement;
+  private readonly locationEl: HTMLElement;
+  private locationName: string | null = null;
+  private locationTimer = 0;
   best: number | null = loadBest();
 
   constructor(
@@ -60,6 +63,9 @@ export class GameUi {
     );
     this.countdownEl = overlay(container, '<h1 class="ui-countdown">3</h1>');
     this.finishEl = overlay(container, '');
+    this.locationEl = document.createElement('div');
+    this.locationEl.className = 'location-toast';
+    container.appendChild(this.locationEl);
     audioSettingsPanel(container, audioSettings, onAudioSettings);
     this.startEl.classList.add('visible');
 
@@ -120,6 +126,24 @@ export class GameUi {
   hideFinish(): void {
     this.finishEl.classList.remove('visible');
     this.countdownEl.classList.remove('visible');
+  }
+
+  updateLocation(name: string | null, dt: number, active: boolean): void {
+    if (!active || name === null) {
+      this.locationEl.classList.remove('visible');
+      this.locationTimer = 0;
+      this.locationName = null;
+      return;
+    }
+    if (name !== this.locationName) {
+      this.locationName = name;
+      this.locationTimer = 2.4;
+      this.locationEl.textContent = name;
+      this.locationEl.classList.add('visible');
+    } else if (this.locationTimer > 0) {
+      this.locationTimer = Math.max(0, this.locationTimer - dt);
+      this.locationEl.classList.toggle('visible', this.locationTimer > 0);
+    }
   }
 }
 

@@ -6,6 +6,7 @@
  */
 
 import { RACE, WORLD } from '../config';
+import { Vec3 } from '../core/math';
 import { hash2 } from '../terrain/noise';
 import type { Terrain } from '../terrain/terrain';
 
@@ -55,22 +56,14 @@ export class Race {
 
   constructor(terrain: Terrain, seed: number) {
     const n = RACE.checkpointCount;
+    const usedZones = new Set<number>();
+    let previous: Checkpoint = { x: 0, z: 0 };
     for (let i = 0; i < n; i++) {
-      // Evenly around a ring with jitter; index 0 starts straight ahead (+Z).
-      const slot = (TWO_PI / n) * i;
-      const angle = slot + (hash2(i, 1, seed) - 0.5) * (TWO_PI / n) * 0.6;
-      let radius = RACE.ringRadius + (hash2(i, 2, seed) - 0.5) * 2 * RACE.ringJitter;
-
-      // Push flooded spots outward until the checkpoint sits on dry land.
-      let x = Math.sin(angle) * radius;
-      let z = Math.cos(angle) * radius;
-      for (let tries = 0; tries < RACE.landSearchTries; tries++) {
-        if (terrain.height(x, z) > WORLD.waterLevel + RACE.minLandHeight) break;
-        radius += RACE.landSearchStep;
-        x = Math.sin(angle) * radius;
-        z = Math.cos(angle) * radius;
-      }
-      this.checkpoints.push({ x, z });
+      const cp = checkpointCandidate(terrain, seed, i, n, usedZones, previous);
+      const zone = terrain.locationZone(cp.x, cp.z);
+      if (zone) usedZones.add(zone.id);
+      this.checkpoints.push(cp);
+      previous = cp;
     }
   }
 
@@ -125,3 +118,71 @@ export class Race {
 }
 
 const TWO_PI = Math.PI * 2;
+
+function checkpointCandidate(
+  terrain: Terrain,
+  seed: number,
+  index: number,
+  count: number,
+  usedZones: ReadonlySet<number>,
+  previous: Checkpoint,
+): Checkpoint {
+  let best: Checkpoint | null = null;
+  let bestScore = -Infinity;
+  for (let c = 0; c < 10; c++) {
+    const slot = (TWO_PI / count) * index;
+    const angle = slot + (hash2(index, 20 + c, seed) - 0.5) * (TWO_PI / count) * 0.82;
+    let radius = RACE.ringRadius + (hash2(index, 40 + c, seed) - 0.5) * 2 * RACE.ringJitter;
+
+    let x = Math.sin(angle) * radius;
+    let z = Math.cos(angle) * radius;
+    for (let tries = 0; tries < RACE.landSearchTries; tries++) {
+      if (terrain.height(x, z) > WORLD.waterLevel + RACE.minLandHeight) break;
+      radius += RACE.landSearchStep;
+      x = Math.sin(angle) * radius;
+      z = Math.cos(angle) * radius;
+    }
+
+    const zone = terrain.locationZone(x, z);
+    const zoneScore = zone ? (usedZones.has(zone.id) ? 0.12 : 0.92) : 0;
+    const ringScore = 1 - Math.abs(radius - RACE.ringRadius) / Math.max(1, RACE.ringJitter * 2);
+    const dryScore = Math.min(1, (terrain.height(x, z) - WORLD.waterLevel) / 8);
+    const score =
+      routeEase(terrain, previous, { x, z }) * 1.75 +
+      zoneScore +
+      ringScore * 0.24 +
+      dryScore * 0.18;
+    if (score > bestScore) {
+      best = { x, z };
+      bestScore = score;
+    }
+  }
+  return best ?? { x: 0, z: RACE.ringRadius };
+}
+
+function routeEase(terrain: Terrain, a: Checkpoint, b: Checkpoint): number {
+  let penalty = 0;
+  const normal = new Vec3();
+  const samples = 10;
+  for (let i = 1; i <= samples; i++) {
+    const t = i / (samples + 1);
+    const x = a.x + (b.x - a.x) * t;
+    const z = a.z + (b.z - a.z) * t;
+    const surface = terrain.surface(x, z);
+    const slopeY = terrain.normal(x, z, normal).y;
+    penalty +=
+      surface === 'water'
+        ? 1.6
+        : surface === 'mud'
+          ? 0.55
+          : surface === 'snow'
+            ? 0.45
+            : surface === 'rock'
+              ? 0.32
+              : surface === 'sand'
+                ? 0.22
+                : 0;
+    if (slopeY < 0.72) penalty += (0.72 - slopeY) * 2.2;
+  }
+  return 1 - penalty / samples;
+}

@@ -48,6 +48,7 @@ export class DebugOverlay {
     const next = race.next;
     const playerCpDist = next ? Math.hypot(next.x - pPos.x, next.z - pPos.z) : 0;
     const playerBiome = world.terrain.biome(pPos.x, pPos.z);
+    const playerLocation = world.terrain.locationZone(pPos.x, pPos.z);
 
     this.el.innerHTML = `
       <div class="debug-title">DEBUG <span>F3</span></div>
@@ -69,6 +70,7 @@ export class DebugOverlay {
           <span>wheels</span><b>${playerGrounded.length}/4 grounded · ${playerSliding.length} sliding</b>
           <span>surface</span><b>${surfaceName(playerGrounded)}</b>
           <span>biome</span><b>${BIOME_LABELS[playerBiome]}</b>
+          <span>location</span><b>${playerLocation?.name ?? 'open country'}</b>
         </div>
       </div>
       <div class="debug-section">
@@ -89,6 +91,7 @@ export class DebugOverlay {
     const sliding = vehicle.wheels.filter((w) => w.sliding);
     const pos = vehicle.body.pos;
     const biome = world.terrain.biome(pos.x, pos.z);
+    const location = world.terrain.locationZone(pos.x, pos.z);
     const t = racer.telemetry;
     return `
       <div class="debug-ai">
@@ -102,6 +105,7 @@ export class DebugOverlay {
           <span>wheels</span><b>${grounded.length}/4 grounded · ${sliding.length} sliding</b>
           <span>surface</span><b>${surfaceName(grounded)}</b>
           <span>biome</span><b>${BIOME_LABELS[biome]}</b>
+          <span>location</span><b>${location?.name ?? 'open country'}</b>
           <span>slide ratio</span><b>${t.slideRatio.toFixed(2)}</b>
           <span>upright</span><b>${t.upright.toFixed(2)}</b>
           <span>tumble</span><b>${t.tumbleRate.toFixed(2)}</b>

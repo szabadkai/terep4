@@ -417,6 +417,30 @@
         animation: ui-pulse 1.6s ease-in-out infinite;
         margin: 0;
       }
+      .location-toast {
+        position: absolute;
+        top: 74px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-6px);
+        padding: 7px 12px;
+        border-radius: 6px;
+        background: rgba(7, 11, 15, 0.66);
+        color: #e8eef4;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        pointer-events: none;
+        opacity: 0;
+        transition:
+          opacity 180ms ease,
+          transform 180ms ease;
+        z-index: 4;
+      }
+      .location-toast.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
       @keyframes ui-pulse {
         50% {
           opacity: 0.45;
@@ -457,6 +481,12 @@
           right: 8px;
           min-width: 132px;
           font-size: 11px;
+        }
+        .location-toast {
+          top: 128px;
+          max-width: calc(100vw - 32px);
+          font-size: 11px;
+          text-align: center;
         }
         .audio-settings {
           top: auto;

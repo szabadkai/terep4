@@ -142,6 +142,11 @@ const loop = new FixedLoop(
     forward.set(0, 0, 1).applyQuaternion(vehicleView.group.quaternion);
     hud.update(world.curr, world.raceState, Math.atan2(forward.x, forward.z));
     debugOverlay.update(world, input.state);
+    ui.updateLocation(
+      terrain.locationZone(world.curr.pos.x, world.curr.pos.z)?.name ?? null,
+      frameDt,
+      started && !paused && world.raceState.phase === 'running',
+    );
 
     if (world.raceState.phase === 'finished' && !finishShown) {
       finishShown = true;
