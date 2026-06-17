@@ -389,7 +389,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** Biome Regions
 
-### [ ] Add Landmarks Near Checkpoints
+### [x] Add Landmarks Near Checkpoints
 
 **Goal:** Make course locations memorable.
 

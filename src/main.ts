@@ -13,6 +13,7 @@ import { SimWorld } from './sim/world';
 import { createScene } from './render/scene';
 import { TerrainView } from './render/terrainView';
 import { ScatterView } from './render/scatterView';
+import { LandmarkView } from './render/landmarkView';
 import { VehicleView } from './render/vehicleView';
 import { CheckpointView } from './render/checkpointView';
 import { CameraRig } from './render/cameraRig';
@@ -35,6 +36,7 @@ input.attach(window);
 const { renderer, scene, camera, sky } = createScene(container);
 const terrainView = new TerrainView(scene, terrain);
 const scatterView = new ScatterView(scene, terrain);
+new LandmarkView(scene, terrain, world.race.checkpoints);
 const vehicleView = new VehicleView(scene, terrain);
 const opponentViews = world.racerViews.map(
   (rv, i) => new VehicleView(scene, terrain, rv.spec.color, i + 1),
