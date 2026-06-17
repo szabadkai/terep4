@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS: AudioSettings = {
   master: 0.75,
   music: 0.45,
   sfx: 0.75,
-  engine: 0.85,
+  engine: 0.95,
   muted: false,
 };
 
@@ -100,6 +100,7 @@ export class GameAudio {
   private engineClock = 0;
   private engineRate = 0.78;
   private engineGain = 0;
+  private loopHealthClock = 0;
 
   constructor() {
     this.raceMusic.preload = 'auto';
@@ -137,12 +138,9 @@ export class GameAudio {
     this.running = true;
     void this.unlock();
     this.ensureMenuMusic();
-    void play(this.raceMusic);
-    void play(this.engine);
-    void play(this.mud);
-    void play(this.water);
-    void play(this.gravel);
-    void play(this.snow);
+    this.setMusicState(this.previousPhase === 'running' ? 'race' : 'menu');
+    this.snapMusicMix();
+    this.ensureRunningLoops();
     if (this.previousPhase === 'ready') void play(this.engineStart);
     this.applySettings();
   }
@@ -185,6 +183,12 @@ export class GameAudio {
     this.previousPhase = race.phase;
 
     if (!this.running) return;
+
+    this.loopHealthClock += frameDt;
+    if (this.loopHealthClock > 0.5) {
+      this.loopHealthClock = 0;
+      this.ensureRunningLoops();
+    }
 
     const speed = Math.max(0, snap.speedKmh / 3.6);
     const groundedWheels = snap.wheels.reduce(
@@ -342,7 +346,7 @@ export class GameAudio {
   }
 
   private engineVolume(): number {
-    return this.sfxVolume() * this.settings.engine;
+    return this.masterVolume() * this.settings.engine;
   }
 
   private updateMusicState(race: RaceState): void {
@@ -378,6 +382,12 @@ export class GameAudio {
     this.raceMusic.volume = volume * RACE_MUSIC_LEVEL * this.raceMusicGain;
     if (this.menuMusic) {
       this.menuMusic.gain.gain.value = volume * MENU_MUSIC_LEVEL * this.menuMusicGain;
+    }
+  }
+
+  private ensureRunningLoops(): void {
+    for (const el of [this.raceMusic, this.engine, this.mud, this.water, this.gravel, this.snow]) {
+      if (el.paused) void play(el);
     }
   }
 
