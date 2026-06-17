@@ -26,10 +26,24 @@ const ASSETS = {
 };
 
 const GEAR_SPEEDS = [0, 7, 13.5, 20.5, 29, 40];
+const MUSIC_FADE_RATE = 1.9;
+const MENU_MUSIC_LEVEL = 0.28;
+const RACE_MUSIC_LEVEL = 0.64;
+
+type MusicState = 'menu' | 'race' | 'quiet';
 
 type WebAudioWindow = Window & {
   webkitAudioContext?: typeof AudioContext;
 };
+
+interface GeneratedMenuMusic {
+  gain: GainNode;
+  filter: BiquadFilterNode;
+  oscA: OscillatorNode;
+  oscB: OscillatorNode;
+  lfo: OscillatorNode;
+  lfoGain: GainNode;
+}
 
 export function loadAudioSettings(): AudioSettings {
   try {
@@ -51,7 +65,7 @@ export function saveAudioSettings(settings: AudioSettings): void {
 export class GameAudio {
   readonly settings: AudioSettings = loadAudioSettings();
 
-  private readonly music = audio(ASSETS.music, true);
+  private readonly raceMusic = audio(ASSETS.music, true);
   private readonly engine = audio(ASSETS.engineLoop, true);
   private readonly mud = audio(ASSETS.mud, true);
   private readonly water = audio(ASSETS.mud, true);
@@ -61,6 +75,10 @@ export class GameAudio {
   private readonly engineAccel = audio(ASSETS.engineAccel, false);
   private readonly checkpoint = audio(ASSETS.checkpoint, false);
   private audioContext: AudioContext | null = null;
+  private menuMusic: GeneratedMenuMusic | null = null;
+  private musicState: MusicState = 'quiet';
+  private menuMusicGain = 0;
+  private raceMusicGain = 0;
   private unlocked = false;
   private running = false;
   private previousCheckpoint = 0;
@@ -78,7 +96,7 @@ export class GameAudio {
   private engineGain = 0;
 
   constructor() {
-    this.music.preload = 'auto';
+    this.raceMusic.preload = 'auto';
     this.engine.preload = 'auto';
     this.mud.preload = 'auto';
     this.water.preload = 'auto';
@@ -110,7 +128,8 @@ export class GameAudio {
   start(): void {
     this.running = true;
     void this.unlock();
-    void play(this.music);
+    this.ensureMenuMusic();
+    void play(this.raceMusic);
     void play(this.engine);
     void play(this.mud);
     void play(this.water);
@@ -122,16 +141,19 @@ export class GameAudio {
 
   pause(): void {
     this.running = false;
+    this.setMusicState('menu');
+    this.snapMusicMix();
     this.engine.volume = 0;
     this.mud.volume = 0;
     this.water.volume = 0;
     this.gravel.volume = 0;
     this.snow.volume = 0;
-    this.music.volume = this.musicVolume() * 0.4;
   }
 
   stop(): void {
     this.running = false;
+    this.setMusicState('quiet');
+    this.snapMusicMix();
     for (const el of [this.engine, this.mud, this.water, this.gravel, this.snow]) {
       el.pause();
       el.currentTime = 0;
@@ -144,6 +166,8 @@ export class GameAudio {
     this.impactCooldown = Math.max(0, this.impactCooldown - frameDt);
     this.landingCooldown = Math.max(0, this.landingCooldown - frameDt);
     this.updateRaceFeedback(race);
+    this.updateMusicState(race);
+    this.updateMusicMix(frameDt);
 
     if (race.phase === 'ready') {
       this.previousCheckpoint = race.current;
@@ -211,8 +235,10 @@ export class GameAudio {
   private async unlock(): Promise<void> {
     if (this.unlocked) return;
     this.unlocked = true;
-    void this.ensureAudioContext()?.resume();
-    for (const el of [this.music, this.engine, this.mud, this.water, this.gravel, this.snow]) {
+    const ctx = this.ensureAudioContext();
+    this.ensureMenuMusic();
+    void ctx?.resume();
+    for (const el of [this.raceMusic, this.engine, this.mud, this.water, this.gravel, this.snow]) {
       el.volume = 0;
       try {
         await play(el);
@@ -278,7 +304,7 @@ export class GameAudio {
   }
 
   private applySettings(): void {
-    this.music.volume = this.musicVolume() * (this.running ? 1 : 0.4);
+    this.applyMusicVolumes();
     this.engine.volume = this.running ? this.engine.volume : 0;
     this.mud.volume = this.running ? this.mud.volume : 0;
     this.water.volume = this.running ? this.water.volume : 0;
@@ -295,6 +321,42 @@ export class GameAudio {
 
   private sfxVolume(): number {
     return this.settings.master * this.settings.sfx;
+  }
+
+  private updateMusicState(race: RaceState): void {
+    if (!this.unlocked) return;
+    if (race.phase === 'running') {
+      this.setMusicState('race');
+    } else if (race.phase === 'countdown' || race.phase === 'ready' || race.phase === 'finished') {
+      this.setMusicState('menu');
+    }
+  }
+
+  private setMusicState(state: MusicState): void {
+    this.musicState = state;
+  }
+
+  private updateMusicMix(frameDt: number): void {
+    const menuTarget = this.musicState === 'menu' ? 1 : 0;
+    const raceTarget = this.musicState === 'race' ? 1 : 0;
+    const mix = clamp01(frameDt * MUSIC_FADE_RATE);
+    this.menuMusicGain += (menuTarget - this.menuMusicGain) * mix;
+    this.raceMusicGain += (raceTarget - this.raceMusicGain) * mix;
+    this.applyMusicVolumes();
+  }
+
+  private snapMusicMix(): void {
+    this.menuMusicGain = this.musicState === 'menu' ? 1 : 0;
+    this.raceMusicGain = this.musicState === 'race' ? 1 : 0;
+    this.applyMusicVolumes();
+  }
+
+  private applyMusicVolumes(): void {
+    const volume = this.musicVolume();
+    this.raceMusic.volume = volume * RACE_MUSIC_LEVEL * this.raceMusicGain;
+    if (this.menuMusic) {
+      this.menuMusic.gain.gain.value = volume * MENU_MUSIC_LEVEL * this.menuMusicGain;
+    }
   }
 
   private engineRpm(speed: number, throttle: number, strain: number): number {
@@ -413,6 +475,45 @@ export class GameAudio {
     if (!AudioContextCtor) return null;
     this.audioContext = new AudioContextCtor();
     return this.audioContext;
+  }
+
+  private ensureMenuMusic(): GeneratedMenuMusic | null {
+    if (this.menuMusic) return this.menuMusic;
+    const ctx = this.ensureAudioContext();
+    if (!ctx) return null;
+
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    const oscA = ctx.createOscillator();
+    const oscB = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+
+    gain.gain.value = 0;
+    filter.type = 'lowpass';
+    filter.frequency.value = 520;
+    filter.Q.value = 0.65;
+
+    oscA.type = 'triangle';
+    oscA.frequency.value = 110;
+    oscB.type = 'sine';
+    oscB.frequency.value = 165;
+    lfo.frequency.value = 0.08;
+    lfoGain.gain.value = 80;
+
+    oscA.connect(filter);
+    oscB.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+
+    oscA.start();
+    oscB.start();
+    lfo.start();
+
+    this.menuMusic = { gain, filter, oscA, oscB, lfo, lfoGain };
+    return this.menuMusic;
   }
 }
 

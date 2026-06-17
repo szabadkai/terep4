@@ -533,7 +533,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** Medium  
 **Depends On:** None
 
-### [ ] Add Music System
+### [x] Add Music System
 
 **Goal:** Give races energy without overwhelming engine and terrain feedback.
 
