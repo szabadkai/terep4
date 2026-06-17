@@ -98,12 +98,35 @@ export class ScatterView {
       tmpScale.setScalar(item.size);
       mesh.setMatrixAt(i, tmpMatrix.compose(tmpPos, tmpQuat, tmpScale));
       const tint = 0.85 + 0.3 * hash2(Math.round(item.x * 3), Math.round(item.z * 3), 97);
-      mesh.setColorAt(i, tmpColor.setScalar(tint));
+      mesh.setColorAt(i, this.instanceTint(item, tint));
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
     return mesh;
+  }
+
+  private instanceTint(item: ScatterItem, tint: number): THREE.Color {
+    const biome = this.terrain.biome(item.x, item.z);
+    if ((item.kind === 'boulder' || item.kind === 'smallRock') && biome === 'snowRidge') {
+      return tmpColor.setRGB(0.9 * tint, 0.96 * tint, 1.12 * tint);
+    }
+    if ((item.kind === 'boulder' || item.kind === 'smallRock') && biome === 'rockyHighlands') {
+      return tmpColor.setRGB(1.08 * tint, 0.94 * tint, 0.82 * tint);
+    }
+    if ((item.kind === 'reed' || item.kind === 'bush') && biome === 'marsh') {
+      return tmpColor.setRGB(0.72 * tint, 0.98 * tint, 0.72 * tint);
+    }
+    if (item.kind === 'log' && biome === 'sandyShore') {
+      return tmpColor.setRGB(1.12 * tint, 1.02 * tint, 0.82 * tint);
+    }
+    if ((item.kind === 'pine' || item.kind === 'deadTree') && biome === 'pineForest') {
+      return tmpColor.setRGB(0.78 * tint, 0.92 * tint, 0.74 * tint);
+    }
+    if (item.kind === 'grassClump' && biome === 'grassland') {
+      return tmpColor.setRGB(1.05 * tint, 1.08 * tint, 0.8 * tint);
+    }
+    return tmpColor.setScalar(tint);
   }
 }
 

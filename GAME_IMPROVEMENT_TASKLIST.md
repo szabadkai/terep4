@@ -346,7 +346,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** Biome Regions
 
-### [ ] Add Biome-Specific Prop Rules
+### [x] Add Biome-Specific Prop Rules
 
 **Goal:** Make scatter support geographic identity instead of being generic trees everywhere.
 

@@ -6,7 +6,7 @@
  */
 
 import { Vec3, smoothstep } from '../core/math';
-import { SCATTER, WORLD } from '../config';
+import { SCATTER, WORLD, type BiomeId, type SurfaceId } from '../config';
 import { hash2, fbm } from './noise';
 import type { Terrain } from './terrain';
 
@@ -41,6 +41,28 @@ export interface ScatterItem {
 
 const tmpNormal = new Vec3();
 
+interface BiomeScatterRule {
+  smallPropChance: number;
+  treeDensityMul: number;
+  pineChance: number;
+  boulderMul: number;
+}
+
+const BIOME_RULES: Record<BiomeId, BiomeScatterRule> = {
+  grassland: { smallPropChance: 0.2, treeDensityMul: 0.64, pineChance: 0.24, boulderMul: 0.65 },
+  pineForest: { smallPropChance: 0.2, treeDensityMul: 1.68, pineChance: 0.92, boulderMul: 0.42 },
+  marsh: { smallPropChance: 0.38, treeDensityMul: 0.22, pineChance: 0.1, boulderMul: 0.14 },
+  rockyHighlands: {
+    smallPropChance: 0.36,
+    treeDensityMul: 0.16,
+    pineChance: 0.64,
+    boulderMul: 6.4,
+  },
+  snowRidge: { smallPropChance: 0.24, treeDensityMul: 0.26, pineChance: 0.74, boulderMul: 2.8 },
+  sandyShore: { smallPropChance: 0.34, treeDensityMul: 0.1, pineChance: 0.12, boulderMul: 0.45 },
+  riverValley: { smallPropChance: 0.28, treeDensityMul: 0.52, pineChance: 0.22, boulderMul: 0.55 },
+};
+
 /** At most one item per cell; null when the cell is empty. */
 export function itemInCell(
   cx: number,
@@ -62,10 +84,9 @@ export function itemInCell(
 
   const size = 0.8 + 0.5 * hash2(cx, cz, seed + 505);
   const rotation = hash2(cx, cz, seed + 506) * Math.PI * 2;
+  const rule = BIOME_RULES[biome];
 
-  const boulderChance =
-    SCATTER.boulderChance *
-    (biome === 'rockyHighlands' ? 5.5 : biome === 'snowRidge' ? 2.2 : biome === 'marsh' ? 0.35 : 1);
+  const boulderChance = SCATTER.boulderChance * rule.boulderMul;
   const boulder = roll > 1 - boulderChance;
   if (boulder) {
     return {
@@ -84,38 +105,13 @@ export function itemInCell(
   if (prop) return prop;
 
   const forest = fbm(x / SCATTER.forestWavelength, z / SCATTER.forestWavelength, 2, seed + 504);
-  const densityMul =
-    biome === 'pineForest'
-      ? 1.55
-      : biome === 'marsh'
-        ? 0.42
-        : biome === 'rockyHighlands'
-          ? 0.28
-          : biome === 'snowRidge'
-            ? 0.38
-            : biome === 'sandyShore'
-              ? 0.18
-              : biome === 'riverValley'
-                ? 0.72
-                : 0.9;
   const density =
-    (SCATTER.treeBase + SCATTER.treeForest * smoothstep(0.05, 0.55, forest)) * densityMul;
+    (SCATTER.treeBase + SCATTER.treeForest * smoothstep(0.05, 0.55, forest)) * rule.treeDensityMul;
   if (roll >= density) return null;
   if (h > SCATTER.treeline) return null;
   if (slopeY < SCATTER.maxSlope) return null;
 
-  const pineChance =
-    biome === 'pineForest'
-      ? 0.88
-      : biome === 'snowRidge'
-        ? 0.78
-        : biome === 'rockyHighlands'
-          ? 0.65
-          : biome === 'marsh' || biome === 'sandyShore'
-            ? 0.18
-            : h > 14
-              ? 0.7
-              : 0.45;
+  const pineChance = h > 14 ? Math.max(rule.pineChance, 0.68) : rule.pineChance;
   const kind: ScatterKind = hash2(cx, cz, seed + 507) < pineChance ? 'pine' : 'tree';
   return {
     kind,
@@ -135,8 +131,8 @@ function smallProp(
   x: number,
   z: number,
   h: number,
-  biome: string,
-  surface: string,
+  biome: BiomeId,
+  surface: SurfaceId,
   shore: boolean,
   slopeY: number,
   seed: number,
@@ -144,40 +140,93 @@ function smallProp(
   if (slopeY < 0.62) return null;
 
   const propRoll = hash2(cx, cz, seed + 520);
-  const chance =
-    biome === 'marsh'
-      ? 0.28
-      : biome === 'rockyHighlands'
-        ? 0.24
-        : biome === 'sandyShore'
-          ? 0.24
-          : biome === 'riverValley'
-            ? 0.22
-            : biome === 'grassland'
-              ? 0.18
-              : biome === 'snowRidge'
-                ? 0.14
-                : 0.12;
+  const chance = BIOME_RULES[biome].smallPropChance;
   if (propRoll > chance) return null;
 
   const pick = hash2(cx, cz, seed + 521);
   const size = 0.65 + 0.8 * hash2(cx, cz, seed + 522);
   const rotation = hash2(cx, cz, seed + 523) * Math.PI * 2;
 
-  if ((shore || biome === 'marsh' || biome === 'riverValley') && pick < 0.42) {
+  if (biome === 'pineForest') {
+    if (pick < 0.42) return propItem('log', x, z, h + 0.08, size * 1.1, rotation, 0.38 * size, 0.4);
+    if (pick < 0.68) {
+      return propItem(
+        'deadTree',
+        x,
+        z,
+        h,
+        size * 0.9,
+        rotation,
+        SCATTER.trunkRadius * size,
+        3.0 * size,
+      );
+    }
+    if (pick < 0.86) return propItem('bush', x, z, h, size * 0.85, rotation, 0, 0.9);
+    return propItem('grassClump', x, z, h, size * 0.72, rotation, 0, 0.48);
+  }
+
+  if (biome === 'marsh') {
+    if (pick < 0.46) return propItem('reed', x, z, h, size, rotation, 0, 1.0);
+    if (pick < 0.68) return propItem('bush', x, z, h, size * 0.72, rotation, 0, 0.8);
+    if (pick < 0.9) return propItem('log', x, z, h + 0.06, size * 0.9, rotation, 0.28 * size, 0.32);
+    return propItem('grassClump', x, z, h, size * 0.85, rotation, 0, 0.48);
+  }
+
+  if (biome === 'rockyHighlands') {
+    if (pick < 0.72) return propItem('smallRock', x, z, h - 0.05 * size, size, rotation, 0, 0.42);
+    if (pick < 0.9) return propItem('bush', x, z, h, size * 0.62, rotation, 0, 0.72);
+    return propItem(
+      'deadTree',
+      x,
+      z,
+      h,
+      size * 0.76,
+      rotation,
+      SCATTER.trunkRadius * size,
+      2.5 * size,
+    );
+  }
+
+  if (biome === 'snowRidge') {
+    if (pick < 0.46)
+      return propItem('smallRock', x, z, h - 0.05 * size, size * 0.9, rotation, 0, 0.36);
+    if (pick < 0.8) {
+      return propItem(
+        'deadTree',
+        x,
+        z,
+        h,
+        size * 0.78,
+        rotation,
+        SCATTER.trunkRadius * size,
+        2.7 * size,
+      );
+    }
+    return propItem('grassClump', x, z, h, size * 0.52, rotation, 0, 0.36);
+  }
+
+  if (biome === 'sandyShore') {
+    if (pick < 0.34) return propItem('reed', x, z, h, size * 0.78, rotation, 0, 0.82);
+    if (pick < 0.72) return propItem('log', x, z, h + 0.08, size, rotation, 0.34 * size, 0.34);
+    if (pick < 0.9)
+      return propItem('smallRock', x, z, h - 0.05 * size, size * 0.68, rotation, 0, 0.3);
+    return propItem('bush', x, z, h, size * 0.58, rotation, 0, 0.62);
+  }
+
+  if ((shore || biome === 'riverValley') && pick < 0.42) {
     return propItem('reed', x, z, h, size * 0.85, rotation, 0, 0.9);
   }
-  if (surface === 'rock' || biome === 'rockyHighlands') {
+  if (surface === 'rock') {
     return pick < 0.62
       ? propItem('smallRock', x, z, h - 0.05 * size, size, rotation, 0, 0.42)
       : propItem('deadTree', x, z, h, size * 0.9, rotation, SCATTER.trunkRadius * size, 3.0 * size);
   }
-  if (surface === 'sand' || biome === 'sandyShore') {
+  if (surface === 'sand') {
     return pick < 0.48
       ? propItem('log', x, z, h + 0.08, size, rotation, 0.42 * size, 0.42 * size)
       : propItem('smallRock', x, z, h - 0.05 * size, size * 0.75, rotation, 0, 0.32);
   }
-  if (surface === 'snow' || biome === 'snowRidge') {
+  if (surface === 'snow') {
     return pick < 0.45
       ? propItem('smallRock', x, z, h - 0.05 * size, size * 0.85, rotation, 0, 0.36)
       : propItem(
