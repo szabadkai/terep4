@@ -52,7 +52,7 @@ const ui = new GameUi(
   audio.settings,
   (settings) => audio.setSettings(settings),
 );
-const hud = new Hud(container, ui.best);
+const hud = new Hud(container, ui.best, world.race.checkpoints);
 const debugOverlay = new DebugOverlay(container);
 
 let started = false;

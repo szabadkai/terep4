@@ -4,7 +4,7 @@
  */
 
 import type { VehicleSnapshot } from '../sim/snapshot';
-import type { RaceState } from '../sim/race';
+import type { Checkpoint, RaceState } from '../sim/race';
 
 const SURFACE_LABELS: Record<string, string> = {
   grass: 'Grass',
@@ -22,6 +22,15 @@ export function formatTime(seconds: number): string {
 }
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+const RADAR_RANGE_METERS = 390;
+const TURN_LABELS = {
+  ahead: 'straight on',
+  slightLeft: 'slight left',
+  slightRight: 'slight right',
+  left: 'left',
+  right: 'right',
+  behind: 'turn back',
+};
 
 export class Hud {
   private readonly speedEl: HTMLElement;
@@ -30,11 +39,18 @@ export class Hud {
   private readonly timeEl: HTMLElement;
   private readonly cpEl: HTMLElement;
   private readonly arrowEl: HTMLElement;
+  private readonly turnEl: HTMLElement;
+  private readonly radarEl: HTMLElement;
+  private readonly radarDots: HTMLElement[] = [];
   private readonly bestEl: HTMLElement;
   private readonly posEl: HTMLElement;
   private readonly standingsEl: HTMLElement;
 
-  constructor(container: HTMLElement, bestTime: number | null) {
+  constructor(
+    container: HTMLElement,
+    bestTime: number | null,
+    private readonly checkpoints: readonly Checkpoint[],
+  ) {
     const panel = document.createElement('div');
     panel.className = 'hud-panel';
     panel.innerHTML = `
@@ -56,6 +72,11 @@ export class Hud {
       <div>
         <div class="hud-time" data-time>0:00.0</div>
         <div class="hud-cp"><span data-cp>CP 1/8</span> · <span data-best>no best yet</span></div>
+        <div class="hud-turn" data-turn>straight on</div>
+      </div>
+      <div class="hud-radar" data-radar aria-hidden="true">
+        <span class="hud-radar-ring"></span>
+        <span class="hud-radar-car"></span>
       </div>
       <div class="hud-pos" data-pos>1<small>st</small></div>
     `;
@@ -77,9 +98,12 @@ export class Hud {
     this.timeEl = race.querySelector('[data-time]')!;
     this.cpEl = race.querySelector('[data-cp]')!;
     this.arrowEl = race.querySelector('[data-arrow]')!;
+    this.turnEl = race.querySelector('[data-turn]')!;
+    this.radarEl = race.querySelector('[data-radar]')!;
     this.bestEl = race.querySelector('[data-best]')!;
     this.posEl = race.querySelector('[data-pos]')!;
     this.standingsEl = standings;
+    this.buildRadarDots();
     this.setBest(bestTime);
   }
 
@@ -100,20 +124,57 @@ export class Hud {
       const dx = race.next.x - snap.pos.x;
       const dz = race.next.z - snap.pos.z;
       const bearing = Math.atan2(dx, dz);
-      const rel = bearing - carYaw;
-      this.arrowEl.style.transform = `rotate(${(-rel * 180) / Math.PI}deg)`;
+      const rel = normalizeAngle(bearing - carYaw);
+      const distance = Math.hypot(dx, dz);
+      this.arrowEl.style.transform = `rotate(${(rel * 180) / Math.PI}deg)`;
       this.arrowEl.style.visibility = 'visible';
+      this.turnEl.textContent = turnLabel(rel);
       this.cpEl.textContent =
         race.phase === 'countdown'
           ? `STARTING · CP ${race.current + 1}/${race.count}`
-          : `CP ${race.current + 1}/${race.count} · ${Math.round(Math.hypot(dx, dz))}m`;
+          : `CP ${race.current + 1}/${race.count} · ${Math.round(distance)}m`;
     } else {
       this.arrowEl.style.visibility = 'hidden';
+      this.turnEl.textContent = '';
       this.cpEl.textContent = race.phase === 'finished' ? 'FINISHED' : `CP -/${race.count}`;
     }
 
+    this.updateRadar(snap, race, carYaw);
     this.updatePosition(race);
     this.updateStandings(race);
+  }
+
+  private buildRadarDots(): void {
+    for (let i = 0; i < this.checkpoints.length; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'hud-radar-dot';
+      dot.dataset.radarDot = String(i);
+      this.radarEl.appendChild(dot);
+      this.radarDots.push(dot);
+    }
+  }
+
+  private updateRadar(snap: VehicleSnapshot, race: RaceState, carYaw: number): void {
+    const active = race.phase !== 'finished';
+    this.radarEl.classList.toggle('hud-radar-finished', !active);
+    for (let i = 0; i < this.radarDots.length; i++) {
+      const dot = this.radarDots[i];
+      const cp = this.checkpoints[i];
+      const dx = cp.x - snap.pos.x;
+      const dz = cp.z - snap.pos.z;
+      const distance = Math.hypot(dx, dz);
+      const rel = normalizeAngle(Math.atan2(dx, dz) - carYaw);
+      const radarRadius = Math.max(18, this.radarEl.clientWidth / 2 - 6);
+      const r = Math.min(1, distance / RADAR_RANGE_METERS) * radarRadius;
+      const x = Math.sin(rel) * r;
+      const y = -Math.cos(rel) * r;
+      const passed = active ? i < race.current : true;
+      const next = active && i === race.current;
+      dot.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      dot.classList.toggle('hud-radar-dot-passed', passed);
+      dot.classList.toggle('hud-radar-dot-next', next);
+      dot.classList.toggle('hud-radar-dot-far', distance > RADAR_RANGE_METERS);
+    }
   }
 
   private updatePosition(race: RaceState): void {
@@ -140,4 +201,19 @@ export class Hud {
       })
       .join('');
   }
+}
+
+function normalizeAngle(angle: number): number {
+  let a = angle;
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+function turnLabel(rel: number): string {
+  const abs = Math.abs(rel);
+  if (abs < 0.22) return TURN_LABELS.ahead;
+  if (abs < 0.75) return rel > 0 ? TURN_LABELS.slightRight : TURN_LABELS.slightLeft;
+  if (abs < 2.35) return rel > 0 ? TURN_LABELS.right : TURN_LABELS.left;
+  return TURN_LABELS.behind;
 }

@@ -470,7 +470,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** High  
 **Depends On:** None
 
-### [ ] Add Navigation Aid
+### [x] Add Navigation Aid
 
 **Goal:** Reduce confusion about where to drive next.
 
