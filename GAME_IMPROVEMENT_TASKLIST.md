@@ -577,7 +577,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** Medium  
 **Depends On:** Countdown Start, Improved Checkpoint Presentation
 
-### [ ] Add Audio Settings UI
+### [x] Add Audio Settings UI
 
 **Goal:** Let players control sound and music cleanly.
 

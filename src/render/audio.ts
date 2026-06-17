@@ -7,12 +7,16 @@ export interface AudioSettings {
   master: number;
   music: number;
   sfx: number;
+  engine: number;
+  muted: boolean;
 }
 
 const DEFAULT_SETTINGS: AudioSettings = {
   master: 0.75,
   music: 0.45,
   sfx: 0.75,
+  engine: 0.85,
+  muted: false,
 };
 
 const ASSETS = {
@@ -52,6 +56,8 @@ export function loadAudioSettings(): AudioSettings {
       master: volumeOrDefault(parsed.master, DEFAULT_SETTINGS.master),
       music: volumeOrDefault(parsed.music, DEFAULT_SETTINGS.music),
       sfx: volumeOrDefault(parsed.sfx, DEFAULT_SETTINGS.sfx),
+      engine: volumeOrDefault(parsed.engine, DEFAULT_SETTINGS.engine),
+      muted: typeof parsed.muted === 'boolean' ? parsed.muted : DEFAULT_SETTINGS.muted,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -109,6 +115,8 @@ export class GameAudio {
     this.settings.master = clamp01(next.master);
     this.settings.music = clamp01(next.music);
     this.settings.sfx = clamp01(next.sfx);
+    this.settings.engine = clamp01(next.engine);
+    this.settings.muted = next.muted === true;
     saveAudioSettings(this.settings);
     this.applySettings();
   }
@@ -197,9 +205,9 @@ export class GameAudio {
     const flutter =
       Math.sin(this.engineClock * 9.7) * 0.018 + Math.sin(this.engineClock * 17.3) * 0.008;
     const targetRate = clamp(0.58 + rpm * 0.92 + strain * 0.12 + flutter, 0.54, 1.82);
+    const engineVolume = this.engineVolume();
     const targetGain =
-      this.sfxVolume() *
-      (0.1 + speedT * 0.24 + throttle * 0.19 + strain * 0.2 + (grounded ? 0 : 0.06));
+      engineVolume * (0.1 + speedT * 0.24 + throttle * 0.19 + strain * 0.2 + (grounded ? 0 : 0.06));
     const mix = clamp01(frameDt * 8);
     this.engineRate += (targetRate - this.engineRate) * mix;
     this.engineGain += (targetGain - this.engineGain) * mix;
@@ -211,7 +219,7 @@ export class GameAudio {
     if ((throttleStab || loadedPull) && this.accelCooldown <= 0) {
       this.accelCooldown = throttleStab ? 1.4 : 2.8;
       this.engineAccel.playbackRate = clamp(0.88 + rpm * 0.38 + strain * 0.18, 0.8, 1.35);
-      this.engineAccel.volume = this.sfxVolume() * (0.12 + strain * 0.12 + throttle * 0.08);
+      this.engineAccel.volume = engineVolume * (0.12 + strain * 0.12 + throttle * 0.08);
       void play(this.engineAccel);
     }
     this.previousThrottle = throttle;
@@ -305,22 +313,36 @@ export class GameAudio {
 
   private applySettings(): void {
     this.applyMusicVolumes();
-    this.engine.volume = this.running ? this.engine.volume : 0;
-    this.mud.volume = this.running ? this.mud.volume : 0;
-    this.water.volume = this.running ? this.water.volume : 0;
-    this.gravel.volume = this.running ? this.gravel.volume : 0;
-    this.snow.volume = this.running ? this.snow.volume : 0;
-    for (const el of [this.engineStart, this.engineAccel, this.checkpoint]) {
-      el.volume = this.sfxVolume();
+    if (!this.running || this.engineVolume() <= 0) {
+      this.engine.volume = 0;
+      this.engineGain = 0;
     }
+    const surfaceVolume = this.sfxVolume();
+    if (!this.running || surfaceVolume <= 0) {
+      this.mud.volume = 0;
+      this.water.volume = 0;
+      this.gravel.volume = 0;
+      this.snow.volume = 0;
+    }
+    this.engineStart.volume = this.engineVolume();
+    this.engineAccel.volume = this.engineVolume();
+    this.checkpoint.volume = surfaceVolume;
+  }
+
+  private masterVolume(): number {
+    return this.settings.muted ? 0 : this.settings.master;
   }
 
   private musicVolume(): number {
-    return this.settings.master * this.settings.music;
+    return this.masterVolume() * this.settings.music;
   }
 
   private sfxVolume(): number {
-    return this.settings.master * this.settings.sfx;
+    return this.masterVolume() * this.settings.sfx;
+  }
+
+  private engineVolume(): number {
+    return this.sfxVolume() * this.settings.engine;
   }
 
   private updateMusicState(race: RaceState): void {

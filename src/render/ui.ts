@@ -10,6 +10,7 @@ import type { RaceState, Standing } from '../sim/race';
 
 const BEST_KEY = 'mud.best';
 const LEGACY_BEST_KEY = 'terep4.best';
+type AudioSliderId = Exclude<keyof AudioSettings, 'muted'>;
 
 export function loadBest(): number | null {
   const raw = localStorage.getItem(BEST_KEY) ?? localStorage.getItem(LEGACY_BEST_KEY);
@@ -132,32 +133,63 @@ function audioSettingsPanel(
   el.innerHTML = `
     <button class="audio-settings-toggle" type="button" aria-label="Audio settings">AUDIO</button>
     <div class="audio-settings-menu">
+      ${muteControl(initial.muted)}
       ${slider('master', 'Master', initial.master)}
       ${slider('music', 'Music', initial.music)}
       ${slider('sfx', 'SFX', initial.sfx)}
+      ${slider('engine', 'Engine', initial.engine)}
     </div>
   `;
   const toggle = el.querySelector<HTMLButtonElement>('.audio-settings-toggle')!;
   const menu = el.querySelector<HTMLElement>('.audio-settings-menu')!;
+  toggle.setAttribute('aria-expanded', 'false');
   toggle.addEventListener('click', (event) => {
     event.stopPropagation();
-    menu.classList.toggle('visible');
+    const visible = menu.classList.toggle('visible');
+    toggle.setAttribute('aria-expanded', String(visible));
   });
   menu.addEventListener('click', (event) => event.stopPropagation());
   const read = (): AudioSettings => ({
+    muted: el.querySelector<HTMLInputElement>('[data-audio-muted]')?.checked ?? false,
     master: readSlider(el, 'master'),
     music: readSlider(el, 'music'),
     sfx: readSlider(el, 'sfx'),
+    engine: readSlider(el, 'engine'),
   });
   for (const input of el.querySelectorAll<HTMLInputElement>('input[type="range"]')) {
     input.addEventListener('input', () => onChange(read()));
-    input.addEventListener('change', () => onChange(read()));
+    input.addEventListener('change', () => {
+      onChange(read());
+      input.blur();
+    });
+    input.addEventListener('pointerup', () => input.blur());
   }
+  const mute = el.querySelector<HTMLInputElement>('[data-audio-muted]')!;
+  mute.addEventListener('change', () => {
+    onChange(read());
+    mute.blur();
+  });
+  mute.addEventListener('pointerup', () => mute.blur());
+  menu.addEventListener('keydown', (event) => {
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyR'].includes(event.code)) {
+      event.preventDefault();
+      (event.target as HTMLElement | null)?.blur();
+    }
+  });
   container.appendChild(el);
   return el;
 }
 
-function slider(id: keyof AudioSettings, label: string, value: number): string {
+function muteControl(muted: boolean): string {
+  return `
+    <label class="audio-settings-check">
+      <span>Mute</span>
+      <input type="checkbox" ${muted ? 'checked' : ''} data-audio-muted />
+    </label>
+  `;
+}
+
+function slider(id: AudioSliderId, label: string, value: number): string {
   return `
     <label>
       <span>${label}</span>
@@ -166,7 +198,7 @@ function slider(id: keyof AudioSettings, label: string, value: number): string {
   `;
 }
 
-function readSlider(container: HTMLElement, id: keyof AudioSettings): number {
+function readSlider(container: HTMLElement, id: AudioSliderId): number {
   return Number(container.querySelector<HTMLInputElement>(`[data-audio="${id}"]`)?.value ?? 0);
 }
 

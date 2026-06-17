@@ -272,9 +272,13 @@
         font-size: 12px;
         cursor: pointer;
       }
+      .audio-settings-toggle[aria-expanded='true'] {
+        border-color: rgba(255, 198, 58, 0.42);
+        background: rgba(16, 22, 28, 0.86);
+      }
       .audio-settings-menu {
         display: none;
-        width: 188px;
+        width: 208px;
         margin-top: 8px;
         padding: 10px 12px;
         border-radius: 8px;
@@ -287,7 +291,7 @@
       }
       .audio-settings label {
         display: grid;
-        grid-template-columns: 56px 1fr;
+        grid-template-columns: 64px 1fr;
         gap: 8px;
         align-items: center;
         font-size: 12px;
@@ -295,6 +299,10 @@
       .audio-settings input {
         width: 100%;
         accent-color: #ffc63a;
+      }
+      .audio-settings-check input {
+        width: auto;
+        justify-self: end;
       }
       .ui-overlay {
         position: absolute;
