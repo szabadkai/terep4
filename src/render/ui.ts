@@ -6,6 +6,7 @@
 
 import { formatTime } from './hud';
 import type { AudioSettings } from './audio';
+import type { CoursePresetSelection } from '../sim/coursePreset';
 import type { RaceState, Standing } from '../sim/race';
 
 const BEST_KEY = 'mud.best';
@@ -37,6 +38,8 @@ export class GameUi {
     onConfirm: () => void,
     audioSettings: AudioSettings,
     onAudioSettings: (settings: AudioSettings) => void,
+    courseSelection: CoursePresetSelection,
+    onCourseSelection: (selection: CoursePresetSelection) => void,
   ) {
     this.startEl = overlay(
       container,
@@ -50,6 +53,7 @@ export class GameUi {
         <span>R</span><span>flip the car back up</span>
         <span>Esc</span><span>pause</span>
       </div>
+      ${coursePresetPanel(courseSelection)}
       <p class="ui-hint">Beat the AI to every checkpoint (follow the arrow). Mud, snow and water are slippery — water is slow, not deadly.</p>
       <p class="ui-action">press ENTER or click to start</p>
     `,
@@ -72,6 +76,27 @@ export class GameUi {
     for (const el of [this.startEl, this.countdownEl, this.pauseEl, this.finishEl]) {
       el.addEventListener('click', onConfirm);
     }
+    const courseEl = this.startEl.querySelector<HTMLElement>('[data-course-presets]');
+    courseEl?.addEventListener('click', (event) => event.stopPropagation());
+    courseEl?.addEventListener('change', () => {
+      onCourseSelection({
+        length:
+          this.startEl.querySelector<HTMLSelectElement>('[data-course-length]')?.value === 'short'
+            ? 'short'
+            : this.startEl.querySelector<HTMLSelectElement>('[data-course-length]')?.value ===
+                'long'
+              ? 'long'
+              : 'standard',
+        difficulty:
+          this.startEl.querySelector<HTMLSelectElement>('[data-course-difficulty]')?.value ===
+          'mild'
+            ? 'mild'
+            : this.startEl.querySelector<HTMLSelectElement>('[data-course-difficulty]')?.value ===
+                'wild'
+              ? 'wild'
+              : 'standard',
+      });
+    });
   }
 
   hideStart(): void {
@@ -145,6 +170,29 @@ export class GameUi {
       this.locationEl.classList.toggle('visible', this.locationTimer > 0);
     }
   }
+}
+
+function coursePresetPanel(selection: CoursePresetSelection): string {
+  return `
+    <div class="ui-course" data-course-presets>
+      <label>
+        <span>Race</span>
+        <select data-course-length>
+          <option value="short" ${selection.length === 'short' ? 'selected' : ''}>Short</option>
+          <option value="standard" ${selection.length === 'standard' ? 'selected' : ''}>Standard</option>
+          <option value="long" ${selection.length === 'long' ? 'selected' : ''}>Long</option>
+        </select>
+      </label>
+      <label>
+        <span>Terrain</span>
+        <select data-course-difficulty>
+          <option value="mild" ${selection.difficulty === 'mild' ? 'selected' : ''}>Mild</option>
+          <option value="standard" ${selection.difficulty === 'standard' ? 'selected' : ''}>Standard</option>
+          <option value="wild" ${selection.difficulty === 'wild' ? 'selected' : ''}>Wild</option>
+        </select>
+      </label>
+    </div>
+  `;
 }
 
 function audioSettingsPanel(

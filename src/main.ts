@@ -10,6 +10,7 @@ import { FixedLoop } from './core/loop';
 import { KeyboardInput } from './input/input';
 import { Terrain, NoiseHeightSource } from './terrain/terrain';
 import { SimWorld } from './sim/world';
+import { DEFAULT_COURSE_SELECTION, type CoursePresetSelection } from './sim/coursePreset';
 import { createScene } from './render/scene';
 import { TerrainView } from './render/terrainView';
 import { ScatterView } from './render/scatterView';
@@ -28,7 +29,8 @@ const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container');
 
 const terrain = new Terrain(new NoiseHeightSource(WORLD.seed));
-const world = new SimWorld(terrain);
+let currentCourseSelection: CoursePresetSelection = { ...DEFAULT_COURSE_SELECTION };
+const world = new SimWorld(terrain, currentCourseSelection);
 
 const input = new KeyboardInput();
 input.attach(window);
@@ -36,12 +38,22 @@ input.attach(window);
 const { renderer, scene, camera, sky } = createScene(container);
 const terrainView = new TerrainView(scene, terrain);
 const scatterView = new ScatterView(scene, terrain);
-new LandmarkView(scene, terrain, world.race.checkpoints);
+let landmarkView = new LandmarkView(
+  scene,
+  terrain,
+  world.race.checkpoints,
+  world.race.preset.captureRadius,
+);
 const vehicleView = new VehicleView(scene, terrain);
 const opponentViews = world.racerViews.map(
   (rv, i) => new VehicleView(scene, terrain, rv.spec.color, i + 1),
 );
-const checkpointView = new CheckpointView(scene, terrain, world.race.checkpoints);
+let checkpointView = new CheckpointView(
+  scene,
+  terrain,
+  world.race.checkpoints,
+  world.race.preset.captureRadius,
+);
 const wheelParticles = new WheelParticles(scene, terrain);
 const tireTracks = new TireTracks(scene, terrain);
 const cameraRig = new CameraRig(camera, terrain);
@@ -51,6 +63,8 @@ const ui = new GameUi(
   () => input.pushAction(),
   audio.settings,
   (settings) => audio.setSettings(settings),
+  currentCourseSelection,
+  (selection) => applyCourseSelection(selection),
 );
 const hud = new Hud(container, ui.best, world.race.checkpoints);
 const debugOverlay = new DebugOverlay(container);
@@ -61,6 +75,30 @@ let finishShown = false;
 let clock = 0;
 
 const forward = new THREE.Vector3();
+
+function applyCourseSelection(selection: CoursePresetSelection): void {
+  if (started) return;
+  currentCourseSelection = selection;
+  if (!world.setCourse(selection)) return;
+  landmarkView.dispose(scene);
+  checkpointView.dispose(scene);
+  landmarkView = new LandmarkView(
+    scene,
+    terrain,
+    world.race.checkpoints,
+    world.race.preset.captureRadius,
+  );
+  checkpointView = new CheckpointView(
+    scene,
+    terrain,
+    world.race.checkpoints,
+    world.race.preset.captureRadius,
+  );
+  hud.setCheckpoints(world.race.checkpoints);
+  finishShown = false;
+  clock = 0;
+  loop.requestRender();
+}
 
 const loop = new FixedLoop(
   SIM.dt,

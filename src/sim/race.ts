@@ -9,6 +9,12 @@ import { RACE, WORLD } from '../config';
 import { Vec3 } from '../core/math';
 import { hash2 } from '../terrain/noise';
 import type { Terrain } from '../terrain/terrain';
+import {
+  DEFAULT_COURSE_SELECTION,
+  coursePreset,
+  type CoursePreset,
+  type CoursePresetSelection,
+} from './coursePreset';
 
 export interface Checkpoint {
   x: number;
@@ -48,18 +54,24 @@ export interface RaceState {
 
 export class Race {
   readonly checkpoints: Checkpoint[] = [];
+  readonly preset: CoursePreset;
   current = 0;
   phase: RacePhase = 'ready';
   elapsed = 0;
   countdownRemaining = 0;
   finishTime: number | null = null;
 
-  constructor(terrain: Terrain, seed: number) {
-    const n = RACE.checkpointCount;
+  constructor(
+    terrain: Terrain,
+    seed: number,
+    selection: CoursePresetSelection = DEFAULT_COURSE_SELECTION,
+  ) {
+    this.preset = coursePreset(selection);
+    const n = this.preset.checkpointCount;
     const usedZones = new Set<number>();
     let previous: Checkpoint = { x: 0, z: 0 };
     for (let i = 0; i < n; i++) {
-      const cp = checkpointCandidate(terrain, seed, i, n, usedZones, previous);
+      const cp = checkpointCandidate(terrain, seed, i, n, usedZones, previous, this.preset);
       const zone = terrain.locationZone(cp.x, cp.z);
       if (zone) usedZones.add(zone.id);
       this.checkpoints.push(cp);
@@ -97,7 +109,7 @@ export class Race {
     this.elapsed += dt;
 
     const cp = this.checkpoints[this.current];
-    if (Math.hypot(x - cp.x, z - cp.z) < RACE.captureRadius) {
+    if (Math.hypot(x - cp.x, z - cp.z) < this.preset.captureRadius) {
       this.current++;
       if (this.current >= this.checkpoints.length) {
         this.phase = 'finished';
@@ -126,18 +138,19 @@ function checkpointCandidate(
   count: number,
   usedZones: ReadonlySet<number>,
   previous: Checkpoint,
+  preset: CoursePreset,
 ): Checkpoint {
   let best: Checkpoint | null = null;
   let bestScore = -Infinity;
   for (let c = 0; c < 10; c++) {
     const slot = (TWO_PI / count) * index;
     const angle = slot + (hash2(index, 20 + c, seed) - 0.5) * (TWO_PI / count) * 0.82;
-    let radius = RACE.ringRadius + (hash2(index, 40 + c, seed) - 0.5) * 2 * RACE.ringJitter;
+    let radius = preset.ringRadius + (hash2(index, 40 + c, seed) - 0.5) * 2 * preset.ringJitter;
 
     let x = Math.sin(angle) * radius;
     let z = Math.cos(angle) * radius;
     for (let tries = 0; tries < RACE.landSearchTries; tries++) {
-      if (terrain.height(x, z) > WORLD.waterLevel + RACE.minLandHeight) break;
+      if (terrain.height(x, z) > WORLD.waterLevel + preset.minLandHeight) break;
       radius += RACE.landSearchStep;
       x = Math.sin(angle) * radius;
       z = Math.cos(angle) * radius;
@@ -145,10 +158,10 @@ function checkpointCandidate(
 
     const zone = terrain.locationZone(x, z);
     const zoneScore = zone ? (usedZones.has(zone.id) ? 0.12 : 0.92) : 0;
-    const ringScore = 1 - Math.abs(radius - RACE.ringRadius) / Math.max(1, RACE.ringJitter * 2);
+    const ringScore = 1 - Math.abs(radius - preset.ringRadius) / Math.max(1, preset.ringJitter * 2);
     const dryScore = Math.min(1, (terrain.height(x, z) - WORLD.waterLevel) / 8);
     const score =
-      routeEase(terrain, previous, { x, z }) * 1.75 +
+      routeEase(terrain, previous, { x, z }) * preset.terrainSafety +
       zoneScore +
       ringScore * 0.24 +
       dryScore * 0.18;
@@ -157,7 +170,7 @@ function checkpointCandidate(
       bestScore = score;
     }
   }
-  return best ?? { x: 0, z: RACE.ringRadius };
+  return best ?? { x: 0, z: preset.ringRadius };
 }
 
 function routeEase(terrain: Terrain, a: Checkpoint, b: Checkpoint): number {

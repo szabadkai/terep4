@@ -12,6 +12,11 @@ import type { Terrain } from '../terrain/terrain';
 import { Vehicle } from './vehicle';
 import { Racer } from './racer';
 import { Race, type RaceState, type Standing } from './race';
+import {
+  DEFAULT_COURSE_SELECTION,
+  sameCourseSelection,
+  type CoursePresetSelection,
+} from './coursePreset';
 import { type VehicleSnapshot, makeSnapshot, fillSnapshot, copySnapshot } from './snapshot';
 
 const NEUTRAL_INPUT: InputState = {
@@ -31,8 +36,8 @@ export interface RacerView {
 
 export class SimWorld {
   readonly vehicle: Vehicle;
-  readonly race: Race;
-  readonly racers: Racer[];
+  race: Race;
+  racers: Racer[];
   readonly racerViews: RacerView[];
   readonly prev: VehicleSnapshot;
   readonly curr: VehicleSnapshot;
@@ -51,10 +56,15 @@ export class SimWorld {
 
   /** Set by input for one tick; consumed here. */
   resetRequested = false;
+  private courseSelection: CoursePresetSelection;
 
-  constructor(readonly terrain: Terrain) {
+  constructor(
+    readonly terrain: Terrain,
+    selection: CoursePresetSelection = DEFAULT_COURSE_SELECTION,
+  ) {
+    this.courseSelection = selection;
     this.vehicle = new Vehicle(BUGGY, terrain);
-    this.race = new Race(terrain, WORLD.seed);
+    this.race = new Race(terrain, WORLD.seed, selection);
     this.racers = OPPONENTS.map((spec) => new Racer(spec, terrain, this.race.checkpoints));
     this.racerViews = this.racers.map((r) => ({
       spec: { name: r.spec.name, color: r.spec.color },
@@ -62,24 +72,10 @@ export class SimWorld {
       curr: makeSnapshot(r.vehicle.wheels.length),
     }));
 
-    // Settle everyone onto the suspension so they rest naturally at the start.
-    for (const r of this.racers) r.reset();
-    for (let i = 0; i < 90; i++) {
-      this.vehicle.step(NEUTRAL_INPUT, SIM.dt);
-      for (const r of this.racers) r.step(SIM.dt, false, 0);
-    }
-
     this.prev = makeSnapshot(this.vehicle.wheels.length);
     this.curr = makeSnapshot(this.vehicle.wheels.length);
-    fillSnapshot(this.vehicle, this.curr);
-    copySnapshot(this.curr, this.prev);
-    for (const v of this.racerViews) {
-      const i = this.racerViews.indexOf(v);
-      fillSnapshot(this.racers[i].vehicle, v.curr);
-      copySnapshot(v.curr, v.prev);
-    }
-    this.race.fillState(this.raceState);
-    this.updateStandings();
+    this.settleEntrants();
+    this.fillSnapshots();
   }
 
   step(input: InputState, dt: number): void {
@@ -133,6 +129,37 @@ export class SimWorld {
 
   startCountdown(): void {
     this.race.startCountdown();
+    this.race.fillState(this.raceState);
+    this.updateStandings();
+  }
+
+  setCourse(selection: CoursePresetSelection): boolean {
+    if (this.race.phase !== 'ready') return false;
+    if (sameCourseSelection(this.courseSelection, selection)) return false;
+    this.courseSelection = selection;
+    this.race = new Race(this.terrain, WORLD.seed, selection);
+    this.racers = OPPONENTS.map((spec) => new Racer(spec, this.terrain, this.race.checkpoints));
+    this.vehicle.reset(0, 0, 0);
+    this.settleEntrants();
+    this.fillSnapshots();
+    return true;
+  }
+
+  private settleEntrants(): void {
+    for (const r of this.racers) r.reset();
+    for (let i = 0; i < 90; i++) {
+      this.vehicle.step(NEUTRAL_INPUT, SIM.dt);
+      for (const r of this.racers) r.step(SIM.dt, false, 0);
+    }
+  }
+
+  private fillSnapshots(): void {
+    fillSnapshot(this.vehicle, this.curr);
+    copySnapshot(this.curr, this.prev);
+    for (let i = 0; i < this.racerViews.length; i++) {
+      fillSnapshot(this.racers[i].vehicle, this.racerViews[i].curr);
+      copySnapshot(this.racerViews[i].curr, this.racerViews[i].prev);
+    }
     this.race.fillState(this.raceState);
     this.updateStandings();
   }

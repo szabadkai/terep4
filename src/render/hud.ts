@@ -49,7 +49,7 @@ export class Hud {
   constructor(
     container: HTMLElement,
     bestTime: number | null,
-    private readonly checkpoints: readonly Checkpoint[],
+    private checkpoints: readonly Checkpoint[],
   ) {
     const panel = document.createElement('div');
     panel.className = 'hud-panel';
@@ -109,6 +109,13 @@ export class Hud {
 
   setBest(bestTime: number | null): void {
     this.bestEl.textContent = bestTime === null ? 'no best yet' : `best ${formatTime(bestTime)}`;
+  }
+
+  setCheckpoints(checkpoints: readonly Checkpoint[]): void {
+    this.checkpoints = checkpoints;
+    for (const dot of this.radarDots) dot.remove();
+    this.radarDots.length = 0;
+    this.buildRadarDots();
   }
 
   update(snap: VehicleSnapshot, race: RaceState, carYaw: number): void {

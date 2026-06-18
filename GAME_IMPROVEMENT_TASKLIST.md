@@ -489,7 +489,7 @@ This list turns the next phase of the project into concrete implementation jobs.
 **Priority:** Medium  
 **Depends On:** Improved Checkpoint Presentation
 
-### [ ] Add Course Presets
+### [x] Add Course Presets
 
 **Goal:** Give replay variety and difficulty options.
 

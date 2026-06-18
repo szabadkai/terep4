@@ -11,7 +11,6 @@ import type { Terrain } from '../terrain/terrain';
 
 const BEAM_HEIGHT = 30;
 const POLE_HEIGHT = 5;
-const GATE_WIDTH = RACE.captureRadius * 1.12;
 const PASS_BURST_TIME = 0.85;
 
 interface Gate {
@@ -37,13 +36,19 @@ export class CheckpointView {
   private previousPhase: RaceState['phase'] = 'ready';
   private lastTimeSec = 0;
 
-  constructor(scene: THREE.Scene, terrain: Terrain, checkpoints: readonly Checkpoint[]) {
+  constructor(
+    scene: THREE.Scene,
+    terrain: Terrain,
+    checkpoints: readonly Checkpoint[],
+    captureRadius = RACE.captureRadius,
+  ) {
+    const gateWidth = captureRadius * 1.12;
     const poleGeo = new THREE.CylinderGeometry(0.09, 0.09, POLE_HEIGHT, 6);
     const sidePoleGeo = new THREE.CylinderGeometry(0.08, 0.08, POLE_HEIGHT * 0.92, 6);
-    const crossbarGeo = new THREE.CylinderGeometry(0.06, 0.06, GATE_WIDTH, 6);
+    const crossbarGeo = new THREE.CylinderGeometry(0.06, 0.06, gateWidth, 6);
     const beamGeo = new THREE.CylinderGeometry(
-      RACE.captureRadius * 0.45,
-      RACE.captureRadius * 0.45,
+      captureRadius * 0.45,
+      captureRadius * 0.45,
       BEAM_HEIGHT,
       10,
       1,
@@ -54,15 +59,11 @@ export class CheckpointView {
       'position',
       new THREE.Float32BufferAttribute([0, 0, 0, 0, -0.55, 0, 1.25, -0.27, 0], 3),
     );
-    const bannerGeo = new THREE.PlaneGeometry(GATE_WIDTH * 0.86, 0.8);
-    const ringGeo = new THREE.TorusGeometry(RACE.captureRadius, 0.12, 6, 36);
-    const haloGeo = new THREE.RingGeometry(
-      RACE.captureRadius * 0.58,
-      RACE.captureRadius * 1.02,
-      36,
-    );
-    const burstRingGeo = new THREE.TorusGeometry(RACE.captureRadius * 0.5, 0.18, 6, 28);
-    const burstPointsGeo = makeBurstPoints();
+    const bannerGeo = new THREE.PlaneGeometry(gateWidth * 0.86, 0.8);
+    const ringGeo = new THREE.TorusGeometry(captureRadius, 0.12, 6, 36);
+    const haloGeo = new THREE.RingGeometry(captureRadius * 0.58, captureRadius * 1.02, 36);
+    const burstRingGeo = new THREE.TorusGeometry(captureRadius * 0.5, 0.18, 6, 28);
+    const burstPointsGeo = makeBurstPoints(captureRadius);
     const poleMat = new THREE.MeshLambertMaterial({ color: COLORS.trim });
 
     for (const cp of checkpoints) {
@@ -73,7 +74,7 @@ export class CheckpointView {
       pole.position.y = POLE_HEIGHT / 2;
       group.add(pole);
 
-      for (const x of [-GATE_WIDTH / 2, GATE_WIDTH / 2]) {
+      for (const x of [-gateWidth / 2, gateWidth / 2]) {
         const sidePole = new THREE.Mesh(sidePoleGeo, poleMat);
         sidePole.position.set(x, (POLE_HEIGHT * 0.92) / 2, 0);
         group.add(sidePole);
@@ -214,6 +215,14 @@ export class CheckpointView {
     }
   }
 
+  dispose(scene: THREE.Scene): void {
+    for (const gate of this.gates) {
+      scene.remove(gate.group);
+      scene.remove(gate.burstGroup);
+    }
+    this.gates.length = 0;
+  }
+
   private updatePassBursts(state: RaceState): void {
     if (
       state.current < this.previousCurrent ||
@@ -261,11 +270,11 @@ export class CheckpointView {
   }
 }
 
-function makeBurstPoints(): THREE.BufferGeometry {
+function makeBurstPoints(captureRadius: number): THREE.BufferGeometry {
   const positions: number[] = [];
   for (let i = 0; i < 18; i++) {
     const a = (i / 18) * Math.PI * 2;
-    const r = RACE.captureRadius * (0.5 + (i % 3) * 0.15);
+    const r = captureRadius * (0.5 + (i % 3) * 0.15);
     positions.push(Math.sin(a) * r, 0.5 + (i % 4) * 0.4, Math.cos(a) * r);
   }
   const geo = new THREE.BufferGeometry();

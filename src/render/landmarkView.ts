@@ -80,6 +80,7 @@ export class LandmarkView {
     scene: THREE.Scene,
     private readonly terrain: Terrain,
     checkpoints: readonly Checkpoint[],
+    private readonly captureRadius = RACE.captureRadius,
   ) {
     for (const zone of terrain.locationZones) {
       const type = MAJOR_STYLE_LANDMARKS[zone.landmarkStyle];
@@ -122,8 +123,8 @@ export class LandmarkView {
     const tangentX = tx / len;
     const tangentZ = tz / len;
     const side = hash2(index, 42, WORLD.seed) < 0.5 ? -1 : 1;
-    const offset = RACE.captureRadius * 1.9 + hash2(index, 43, WORLD.seed) * 10;
-    const slide = (hash2(index, 44, WORLD.seed) - 0.5) * RACE.captureRadius * 0.8;
+    const offset = this.captureRadius * 1.9 + hash2(index, 43, WORLD.seed) * 10;
+    const slide = (hash2(index, 44, WORLD.seed) - 0.5) * this.captureRadius * 0.8;
     let x = cp.x + nx * side * offset + tangentX * slide;
     let z = cp.z + nz * side * offset + tangentZ * slide;
 
@@ -131,8 +132,8 @@ export class LandmarkView {
       const dist = Math.hypot(x - cp.x, z - cp.z);
       if (
         this.isReadableGround(x, z) &&
-        dist > RACE.captureRadius * 1.45 &&
-        this.isClearOfCheckpoints(x, z, checkpoints, RACE.captureRadius * 1.25)
+        dist > this.captureRadius * 1.45 &&
+        this.isClearOfCheckpoints(x, z, checkpoints, this.captureRadius * 1.25)
       ) {
         break;
       }
@@ -159,7 +160,7 @@ export class LandmarkView {
       best.x,
       best.z,
       checkpoints,
-      RACE.captureRadius * 2.2,
+      this.captureRadius * 2.2,
     );
 
     for (let tries = 0; tries < 16; tries++) {
@@ -169,7 +170,7 @@ export class LandmarkView {
       const z = zone.center.z + Math.cos(angle) * distance;
       const insideZone = Math.hypot(x - zone.center.x, z - zone.center.z) < zone.radius * 0.62;
       const score =
-        this.landmarkPlacementScore(x, z, checkpoints, RACE.captureRadius * 2.2) +
+        this.landmarkPlacementScore(x, z, checkpoints, this.captureRadius * 2.2) +
         (insideZone ? 0 : 50) +
         distance / maxRadius;
       const candidate = { x, z, rotation: Math.atan2(zone.center.x - x, zone.center.z - z) };
@@ -181,7 +182,7 @@ export class LandmarkView {
       if (
         insideZone &&
         this.isReadableGround(x, z) &&
-        this.isClearOfCheckpoints(x, z, checkpoints, RACE.captureRadius * 2.2)
+        this.isClearOfCheckpoints(x, z, checkpoints, this.captureRadius * 2.2)
       ) {
         return candidate;
       }
@@ -210,6 +211,11 @@ export class LandmarkView {
       collisionRadius: LANDMARK_COLLISION_RADIUS[type] * scaleBoost,
     };
     this.group.add(landmark);
+  }
+
+  dispose(scene: THREE.Scene): void {
+    scene.remove(this.group);
+    this.group.clear();
   }
 
   private minorTypeForCheckpoint(
