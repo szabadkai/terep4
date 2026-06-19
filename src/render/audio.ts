@@ -19,14 +19,16 @@ const DEFAULT_SETTINGS: AudioSettings = {
   muted: false,
 };
 
+const publicAsset = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
+
 const ASSETS = {
-  music: '/audio/music.ogg',
-  engineLoop: '/audio/engine-loop.ogg',
-  engineStart: '/audio/engine-start.ogg',
-  engineAccel: '/audio/engine-accel.ogg',
-  checkpoint: '/audio/checkpoint-horn.ogg',
-  mud: '/audio/mud.ogg',
-  gravel: '/audio/gravel.ogg',
+  music: publicAsset('audio/music.ogg'),
+  engineLoop: publicAsset('audio/engine-loop.ogg'),
+  engineStart: publicAsset('audio/engine-start.ogg'),
+  engineAccel: publicAsset('audio/engine-accel.ogg'),
+  checkpoint: publicAsset('audio/checkpoint-horn.ogg'),
+  mud: publicAsset('audio/mud.ogg'),
+  gravel: publicAsset('audio/gravel.ogg'),
 };
 
 const GEAR_SPEEDS = [0, 7, 13.5, 20.5, 29, 40];
